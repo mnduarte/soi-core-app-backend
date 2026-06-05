@@ -14,10 +14,16 @@ export class TransactionsService {
   ) {}
 
   async create(clinicId: string, dto: CreateTransactionDto, requester: JwtPayload) {
+    // El alta manual solo permite PAYMENT (cobro) o CHARGE (cargo). REFUND/VOID
+    // son internos (se generan al anular).
+    const type =
+      dto.type === TransactionType.CHARGE
+        ? TransactionType.CHARGE
+        : TransactionType.PAYMENT;
     return this.transactionModel.create({
       clinicId: new Types.ObjectId(clinicId),
       patientId: new Types.ObjectId(dto.patientId),
-      type: TransactionType.PAYMENT,
+      type,
       amount: dto.amount,
       paymentMethod: dto.paymentMethod,
       description: dto.description,
@@ -45,13 +51,19 @@ export class TransactionsService {
       {
         $group: {
           _id: null,
+          // Convención deuda-positiva: saldo > 0 = el paciente DEBE.
+          //   CHARGE / REFUND → suman deuda    PAYMENT → resta    VOID → ignora
+          // (los anulados ya quedan fuera por voidedAt: null)
           total: {
             $sum: {
-              $cond: [
-                { $eq: ['$type', TransactionType.PAYMENT] },
-                '$amount',
-                { $multiply: ['$amount', -1] },
-              ],
+              $switch: {
+                branches: [
+                  { case: { $eq: ['$type', TransactionType.PAYMENT] }, then: { $multiply: ['$amount', -1] } },
+                  { case: { $eq: ['$type', TransactionType.CHARGE] }, then: '$amount' },
+                  { case: { $eq: ['$type', TransactionType.REFUND] }, then: '$amount' },
+                ],
+                default: 0,
+              },
             },
           },
         },

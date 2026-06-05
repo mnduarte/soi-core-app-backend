@@ -5,6 +5,9 @@ import { BaseEntity } from '../../../common/base/base.entity';
 export type TransactionDocument = HydratedDocument<Transaction>;
 
 export enum TransactionType {
+  // Cargo: lo que el paciente DEBE (un tratamiento realizado). Suma al saldo.
+  CHARGE = 'CHARGE',
+  // Pago: lo que el paciente abona. Resta del saldo.
   PAYMENT = 'PAYMENT',
   REFUND = 'REFUND',
   VOID = 'VOID',

@@ -7,6 +7,11 @@ import {
   TreatmentPlan,
   TreatmentPlanDocument,
 } from './schemas/treatment-plan.schema';
+import {
+  Transaction,
+  TransactionDocument,
+  TransactionType,
+} from '../transactions/schemas/transaction.schema';
 import { CreateTreatmentPlanDto } from './dto/create-treatment-plan.dto';
 import {
   AddTreatmentItemDto,
@@ -19,6 +24,7 @@ import { JwtPayload } from '../../common/decorators/current-user.decorator';
 export class TreatmentPlansService {
   constructor(
     @InjectModel(TreatmentPlan.name) private planModel: Model<TreatmentPlanDocument>,
+    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
   ) {}
 
   async create(clinicId: string, patientId: string, dto: CreateTreatmentPlanDto, requester: JwtPayload) {
@@ -73,10 +79,35 @@ export class TreatmentPlansService {
     const plan = await this.findById(clinicId, planId);
     const item = plan.items.find(i => i._id.toString() === itemId);
     if (!item) throw new NotFoundException('Item no encontrado');
+
+    const wasCompleted = item.status === TreatmentItemStatus.COMPLETED;
+
     Object.assign(item, {
       ...dto,
       estimatedDate: dto.estimatedDate ? new Date(dto.estimatedDate) : item.estimatedDate,
     });
+
+    // Al completar un ítem (transición real, con precio y sin cargo previo) se
+    // genera el cargo en la cuenta corriente. Idempotente vía chargeTransactionId.
+    if (
+      item.status === TreatmentItemStatus.COMPLETED &&
+      !wasCompleted &&
+      !item.chargeTransactionId &&
+      item.price > 0
+    ) {
+      const charge = await this.transactionModel.create({
+        clinicId: new Types.ObjectId(clinicId),
+        patientId: plan.patientId,
+        type: TransactionType.CHARGE,
+        amount: item.price,
+        description: item.toothNumber
+          ? `${item.description} · diente ${item.toothNumber}`
+          : item.description,
+        createdBy: new Types.ObjectId(requester.sub),
+      });
+      item.chargeTransactionId = charge._id as Types.ObjectId;
+    }
+
     plan.updatedAt = new Date();
     plan.updatedBy = new Types.ObjectId(requester.sub);
     plan.markModified('items');

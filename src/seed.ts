@@ -35,7 +35,7 @@ async function seed() {
   }
 
   // Owner user
-  const ownerEmail = 'owner@demo.com';
+  const ownerEmail = 'owner';
   let owner = await userModel.findOne({ email: ownerEmail }).exec();
   if (!owner) {
     const passwordHash = await argon2.hash('password123');
@@ -53,7 +53,7 @@ async function seed() {
   }
 
   // Admin user
-  const adminEmail = 'admin@soi.com';
+  const adminEmail = 'admin';
   let admin = await adminModel.findOne({ email: adminEmail }).exec();
   if (!admin) {
     const passwordHash = await argon2.hash('admin123');
@@ -68,8 +68,8 @@ async function seed() {
   }
 
   console.log('\n📋 Credenciales:');
-  console.log('  App:         owner@demo.com  /  password123  →  http://localhost:5173');
-  console.log('  Backoffice:  admin@soi.com   /  admin123     →  http://localhost:5174');
+  console.log('  App:         owner  /  password123  →  http://localhost:5173');
+  console.log('  Backoffice:  admin   /  admin123     →  http://localhost:5174');
 
   await app.close();
 }

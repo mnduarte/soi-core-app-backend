@@ -40,6 +40,11 @@ export class TreatmentItem {
   @Prop({ default: TreatmentItemStatus.PROPOSED, enum: TreatmentItemStatus })
   status: TreatmentItemStatus;
 
+  // Cargo generado en la cuenta corriente al completar este ítem. Guardarlo
+  // hace el cobro idempotente: re-completar no vuelve a cargar.
+  @Prop({ type: Types.ObjectId, ref: 'Transaction' })
+  chargeTransactionId?: Types.ObjectId;
+
   // Tentative date — when the dentist expects to schedule/do the work. Not the
   // same as the appointment's startsAt; this can exist before a turno is
   // generated. Stored as Date so we can sort and filter.
