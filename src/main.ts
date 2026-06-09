@@ -4,15 +4,27 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+// Local dev defaults — overridden in production by the FRONTEND_URLS env var.
+const DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174'];
+
+function parseAllowedOrigins(): string[] {
+  // Comma-separated list (e.g.
+  //   FRONTEND_URLS=https://app.soi.com,https://console.soi.com
+  // ) so a single env var holds all production origins. We always
+  // keep the dev origins so a `fly ssh console` session targeting
+  // the prod app from a local browser still works.
+  const fromEnv = (process.env.FRONTEND_URLS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  return [...new Set([...DEV_ORIGINS, ...fromEnv])];
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      process.env.FRONTEND_URL ?? '',
-    ].filter(Boolean),
+    origin: parseAllowedOrigins(),
     credentials: true,
   });
 
@@ -27,9 +39,12 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  const port = process.env.PORT ?? 3000;
-  await app.listen(port);
-  console.log(`SOI backend running on http://localhost:${port}`);
+  // Bind to 0.0.0.0 so Fly.io's load balancer (and any container runtime)
+  // can reach the process from outside the container. Locally this still
+  // resolves to localhost from the browser.
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, '0.0.0.0');
+  console.log(`SOI backend listening on 0.0.0.0:${port}`);
 }
 
 bootstrap();

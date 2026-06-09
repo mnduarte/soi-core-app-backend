@@ -1,0 +1,35 @@
+# Fly.io config for the SOI NestJS backend.
+# The app name is picked at first `fly launch` — replace `<APP_NAME>` then.
+# Region: gru = São Paulo (closest to AR / lowest LATAM latency on Fly).
+
+app = "<APP_NAME>"
+primary_region = "gru"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Machines stop after a few minutes idle and auto-wake on the next
+  # request. Free-tier friendly — adds ~1s of latency on cold starts.
+  # Set min_machines_running = 1 if cold starts ever become unacceptable.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
