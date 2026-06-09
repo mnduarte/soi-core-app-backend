@@ -33,6 +33,17 @@ export class UsersController {
     return this.usersService.findAll(clinicId, clinical);
   }
 
+  // Returns the current authenticated user. Used by core-app-frontend after
+  // impersonation to render the doctor's name in the banner without having to
+  // decode the JWT for anything other than ids.
+  @Get('me')
+  getMe(
+    @ClinicId() clinicId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.usersService.findById(clinicId, user.sub);
+  }
+
   @Get(':id')
   findOne(@ClinicId() clinicId: string, @Param('id') id: string) {
     return this.usersService.findById(clinicId, id);

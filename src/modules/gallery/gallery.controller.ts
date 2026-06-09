@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -13,7 +14,12 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { GalleryService } from './gallery.service';
-import { CreateGallerySessionDto, AddPhotoDto } from './dto/gallery.dto';
+import {
+  CreateGallerySessionDto,
+  AddPhotoDto,
+  UpdateGallerySessionDto,
+  UpdatePhotoDto,
+} from './dto/gallery.dto';
 
 @Controller('patients/:patientId/gallery')
 @UseGuards(JwtAuthGuard)
@@ -53,6 +59,27 @@ export class GalleryController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.galleryService.addPhoto(clinicId, sessionId, dto, user);
+  }
+
+  @Patch('sessions/:sessionId')
+  updateSession(
+    @ClinicId() clinicId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: UpdateGallerySessionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.galleryService.updateSession(clinicId, sessionId, dto, user);
+  }
+
+  @Patch('sessions/:sessionId/photos/:photoId')
+  updatePhoto(
+    @ClinicId() clinicId: string,
+    @Param('sessionId') sessionId: string,
+    @Param('photoId') photoId: string,
+    @Body() dto: UpdatePhotoDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.galleryService.updatePhoto(clinicId, sessionId, photoId, dto, user);
   }
 
   @Delete('sessions/:sessionId/photos/:photoId')

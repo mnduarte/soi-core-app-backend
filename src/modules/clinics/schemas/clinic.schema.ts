@@ -49,6 +49,20 @@ export class Clinic extends BaseEntity {
   @Prop({ required: true, lowercase: true, trim: true })
   slug: string;
 
+  // Backoffice contact info — independent from the OWNER user's email/name
+  // because the same clinic might change owners over time.
+  @Prop()
+  doctorName?: string;
+
+  @Prop()
+  city?: string;
+
+  @Prop()
+  phone?: string;
+
+  @Prop({ lowercase: true, trim: true })
+  contactEmail?: string;
+
   @Prop({ enum: SubscriptionStatus, default: SubscriptionStatus.TRIAL })
   status: SubscriptionStatus;
 
@@ -60,6 +74,12 @@ export class Clinic extends BaseEntity {
 
   @Prop({ default: '#2F54EB' })
   brandColor: string;
+
+  // Visual treatment for the clinic logo in the app and backoffice. `tooth`
+  // = the default Molar diente. `mono` = a colored square with the clinic's
+  // initials. Custom upload would add a third option later.
+  @Prop({ type: String, enum: ['tooth', 'mono'], default: 'tooth' })
+  logoStyle: 'tooth' | 'mono';
 
   @Prop({ type: Object, default: () => ({}) })
   settings: ClinicSettings;

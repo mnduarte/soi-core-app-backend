@@ -10,6 +10,9 @@ import {
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { LookupDto } from './dto/lookup.dto';
+import { SetupPasswordDto } from './dto/setup-password.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { Throttle } from '@nestjs/throttler';
 
@@ -22,6 +25,31 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(
+      dto,
+      req.ip,
+      req.headers['user-agent'],
+    );
+  }
+
+  @Post('lookup')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  lookup(@Body() dto: LookupDto) {
+    return this.authService.lookup(dto);
+  }
+
+  @Post('request-password-reset')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('setup-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  setupPassword(@Body() dto: SetupPasswordDto, @Req() req: Request) {
+    return this.authService.setupPassword(
       dto,
       req.ip,
       req.headers['user-agent'],

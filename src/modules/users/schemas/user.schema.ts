@@ -28,6 +28,12 @@ export class User extends BaseEntity {
   @Prop({ required: true, lowercase: true, trim: true })
   email: string;
 
+  // Username for clinic-scoped login (typically === clinic.slug for OWNER
+  // users created from the backoffice). Optional because legacy users
+  // created via invitation flow only have email.
+  @Prop({ lowercase: true, trim: true })
+  username?: string;
+
   @Prop({ required: true })
   passwordHash: string;
 
@@ -45,6 +51,11 @@ export class User extends BaseEntity {
 
   @Prop()
   lastLoginAt?: Date;
+
+  // Set to true when an admin creates the account or resets credentials.
+  // Forces the user through a "create your password" flow on first login.
+  @Prop({ default: false })
+  mustChangePassword: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
@@ -52,5 +63,12 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index(
   { clinicId: 1, email: 1 },
   { unique: true, partialFilterExpression: { deletedAt: null } },
+);
+UserSchema.index(
+  { clinicId: 1, username: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { deletedAt: null, username: { $type: 'string' } },
+  },
 );
 UserSchema.index({ clinicId: 1, isClinical: 1 });

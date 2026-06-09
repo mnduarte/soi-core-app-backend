@@ -20,6 +20,17 @@ export class RefreshToken {
   @Prop({ type: Date, default: null })
   revokedAt?: Date;
 
+  // Why this token was revoked. Lets the refresh handler tell apart
+  // "session ended cleanly because user logged in elsewhere" from
+  // "this looks like a stolen-token replay" — the second one nukes
+  // every active session for the user; the first one does not.
+  @Prop({
+    type: String,
+    enum: ['ROTATED', 'LOGOUT', 'SESSION_REPLACED'],
+    default: null,
+  })
+  revokeReason?: 'ROTATED' | 'LOGOUT' | 'SESSION_REPLACED' | null;
+
   @Prop({ type: Types.ObjectId })
   replacedByTokenId?: Types.ObjectId;
 

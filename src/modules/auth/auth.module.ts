@@ -10,6 +10,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
 import { Clinic, ClinicSchema } from '../clinics/schemas/clinic.schema';
 import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
 import { Invitation, InvitationSchema } from '../invitations/schemas/invitation.schema';
+import { AdminModule } from '../admin/admin.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { Invitation, InvitationSchema } from '../invitations/schemas/invitation.
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: Invitation.name, schema: InvitationSchema },
     ]),
+    AdminModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

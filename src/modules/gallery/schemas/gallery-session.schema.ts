@@ -4,6 +4,14 @@ import { BaseEntity } from '../../../common/base/base.entity';
 
 export type GallerySessionDocument = HydratedDocument<GallerySession>;
 
+// Photo category used by the gallery UI to group + filter (timeline view
+// shows separate subheaders per type; the filter chips switch between them).
+export enum PhotoType {
+  INTRAORAL = 'INTRAORAL',
+  EXTRAORAL = 'EXTRAORAL',
+  RADIOGRAFIA = 'RADIOGRAFIA',
+}
+
 export class GalleryPhoto {
   @Prop({ type: Types.ObjectId, auto: true })
   _id: Types.ObjectId;
@@ -16,6 +24,9 @@ export class GalleryPhoto {
 
   @Prop()
   thumbnailUrl?: string;
+
+  @Prop({ type: String, enum: PhotoType, default: PhotoType.INTRAORAL })
+  type: PhotoType;
 
   @Prop()
   caption?: string;

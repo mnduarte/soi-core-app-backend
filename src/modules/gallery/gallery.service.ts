@@ -1,8 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { GallerySession, GallerySessionDocument } from './schemas/gallery-session.schema';
-import { CreateGallerySessionDto, AddPhotoDto } from './dto/gallery.dto';
+import {
+  GallerySession,
+  GallerySessionDocument,
+  PhotoType,
+} from './schemas/gallery-session.schema';
+import {
+  CreateGallerySessionDto,
+  AddPhotoDto,
+  UpdateGallerySessionDto,
+  UpdatePhotoDto,
+} from './dto/gallery.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -54,11 +63,43 @@ export class GalleryService {
       publicId: dto.publicId,
       url: dto.url,
       thumbnailUrl: dto.thumbnailUrl,
+      type: dto.type ?? PhotoType.INTRAORAL,
       caption: dto.caption,
       toothNumber: dto.toothNumber,
       uploadedAt: new Date(),
       uploadedBy: new Types.ObjectId(requester.sub),
     });
+    session.markModified('photos');
+    return session.save();
+  }
+
+  async updateSession(
+    clinicId: string,
+    sessionId: string,
+    dto: UpdateGallerySessionDto,
+    requester: JwtPayload,
+  ) {
+    const session = await this.findSession(clinicId, sessionId);
+    if (dto.title !== undefined) session.title = dto.title;
+    if (dto.notes !== undefined) session.notes = dto.notes;
+    session.updatedBy = new Types.ObjectId(requester.sub);
+    return session.save();
+  }
+
+  async updatePhoto(
+    clinicId: string,
+    sessionId: string,
+    photoId: string,
+    dto: UpdatePhotoDto,
+    requester: JwtPayload,
+  ) {
+    const session = await this.findSession(clinicId, sessionId);
+    const photo = session.photos.find(p => p._id.toString() === photoId);
+    if (!photo) throw new NotFoundException('Foto no encontrada');
+    if (dto.type !== undefined) photo.type = dto.type;
+    if (dto.caption !== undefined) photo.caption = dto.caption;
+    if (dto.toothNumber !== undefined) photo.toothNumber = dto.toothNumber;
+    session.updatedBy = new Types.ObjectId(requester.sub);
     session.markModified('photos');
     return session.save();
   }

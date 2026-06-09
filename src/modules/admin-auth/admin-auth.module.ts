@@ -16,7 +16,7 @@ import { JwtAdminStrategy } from './strategies/jwt-admin.strategy';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_ADMIN_SECRET', 'admin_secret'),
-        signOptions: { expiresIn: config.get<string>('JWT_ADMIN_EXPIRES_IN', '1h') as any },
+        signOptions: { expiresIn: config.get<string>('JWT_ADMIN_EXPIRES_IN', '24h') as any },
       }),
     }),
   ],

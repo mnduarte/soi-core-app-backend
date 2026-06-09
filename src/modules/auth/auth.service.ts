@@ -17,7 +17,15 @@ import { Clinic, ClinicDocument, SubscriptionStatus } from '../clinics/schemas/c
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
 import { Invitation, InvitationDocument } from '../invitations/schemas/invitation.schema';
 import { LoginDto } from './dto/login.dto';
+import { LookupDto } from './dto/lookup.dto';
+import { SetupPasswordDto } from './dto/setup-password.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import {
+  PasswordResetRequest,
+  PasswordResetRequestDocument,
+} from '../admin/schemas/password-reset-request.schema';
+import { TelegramService } from '../admin/telegram.service';
 import { addDays } from 'date-fns';
 
 function isReadonly(clinic: Clinic): boolean {
@@ -46,19 +54,161 @@ export class AuthService {
     private refreshTokenModel: Model<RefreshTokenDocument>,
     @InjectModel(Invitation.name)
     private invitationModel: Model<InvitationDocument>,
+    @InjectModel(PasswordResetRequest.name)
+    private resetRequestModel: Model<PasswordResetRequestDocument>,
     private jwtService: JwtService,
     private config: ConfigService,
+    private telegram: TelegramService,
   ) {}
 
-  async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
+  // Public lookup used by the two-step login UI. Returns the display name
+  // and clinic branding for the welcome screen, plus the mustChangePassword
+  // flag so the client knows whether to show "ingresá tu contraseña" or
+  // "creá tu contraseña". Does not authenticate — no password is checked
+  // here and no token is issued. Rate-limited at the controller layer.
+  async lookup(dto: LookupDto) {
+    const raw = dto.identifier.trim().toLowerCase();
+    if (!raw) {
+      return { exists: false };
+    }
+
     const user = await this.userModel
-      .findOne({ email: dto.email.toLowerCase(), deletedAt: null })
+      .findOne({
+        deletedAt: null,
+        $or: [{ email: raw }, { username: raw }],
+      })
+      .exec();
+
+    if (!user) {
+      return { exists: false };
+    }
+
+    const clinic = await this.clinicModel.findById(user.clinicId).exec();
+
+    return {
+      exists: true,
+      displayName: user.name,
+      mustChangePassword: user.mustChangePassword === true,
+      clinic: clinic
+        ? {
+            name: clinic.name,
+            brandColor: clinic.brandColor,
+            logoStyle: clinic.logoStyle ?? 'tooth',
+          }
+        : null,
+    };
+  }
+
+  // First-login: verify the temp password, set the chosen one, clear the
+  // flag, and issue tokens just like a normal login. Same response shape
+  // as login() so the client can drop the user straight into the app.
+  async setupPassword(dto: SetupPasswordDto, ipAddress?: string, userAgent?: string) {
+    const raw = dto.identifier.trim().toLowerCase();
+    const user = await this.userModel
+      .findOne({
+        deletedAt: null,
+        $or: [{ email: raw }, { username: raw }],
+      })
+      .exec();
+
+    if (!user) throw new UnauthorizedException('Credenciales inválidas');
+    if (!user.mustChangePassword) {
+      throw new BadRequestException('Esta cuenta ya tiene contraseña definida');
+    }
+
+    const valid = await argon2.verify(user.passwordHash, dto.currentPassword);
+    if (!valid) throw new UnauthorizedException('Credenciales inválidas');
+
+    const clinic = await this.clinicModel.findById(user.clinicId).exec();
+    if (!clinic) throw new UnauthorizedException('Consultorio no encontrado');
+    if (isFullyBlocked(clinic)) {
+      throw new ForbiddenException('La suscripción venció.');
+    }
+
+    user.passwordHash = await argon2.hash(dto.newPassword);
+    user.mustChangePassword = false;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    await this.revokeOtherSessions(user._id as Types.ObjectId);
+
+    return this.buildAuthResponse(user, clinic, ipAddress, userAgent);
+  }
+
+  // Public "olvidé mi contraseña". Always returns `{ ok: true }` — even when
+  // the identifier doesn't match a user — so an attacker can't enumerate
+  // accounts through this endpoint. Real matches create a row in
+  // password_reset_requests (deduped: one pending row per user) and fire a
+  // Telegram push to the super-admin.
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const raw = dto.identifier.trim().toLowerCase();
+    if (!raw) return { ok: true };
+
+    const user = await this.userModel
+      .findOne({
+        deletedAt: null,
+        $or: [{ email: raw }, { username: raw }],
+      })
+      .exec();
+
+    if (!user) return { ok: true };
+
+    const existing = await this.resetRequestModel
+      .findOne({ userId: user._id, resolvedAt: null })
+      .exec();
+
+    if (!existing) {
+      await this.resetRequestModel.create({
+        clinicId: user.clinicId,
+        userId: user._id,
+        identifier: raw,
+        note: dto.note?.trim() || undefined,
+        requestedAt: new Date(),
+      });
+
+      const clinic = await this.clinicModel.findById(user.clinicId).select('name').exec();
+      const lines = [
+        '🔑 <b>Pedido de reset de contraseña</b>',
+        `Usuario: <code>${raw}</code> (${user.name})`,
+        clinic ? `Consultorio: ${clinic.name}` : null,
+        dto.note ? `Motivo: ${dto.note.trim()}` : null,
+        '',
+        'Resolvelo desde la consola.',
+      ].filter(Boolean);
+      // Fire-and-forget so a Telegram outage doesn't block the response.
+      this.telegram.notify(lines.join('\n')).catch(() => {});
+    }
+
+    return { ok: true };
+  }
+
+  async login(dto: LoginDto, ipAddress?: string, userAgent?: string) {
+    // Accept either `identifier` (preferred — could be username or email) or
+    // legacy `email`. The actual lookup tries both fields so the dentist can
+    // sign in with whatever the backoffice gave them.
+    const raw = (dto.identifier ?? dto.email ?? '').trim().toLowerCase();
+    if (!raw) throw new UnauthorizedException('Credenciales inválidas');
+
+    const user = await this.userModel
+      .findOne({
+        deletedAt: null,
+        $or: [{ email: raw }, { username: raw }],
+      })
       .exec();
 
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
+
+    // First-login user: refuse the regular login flow and tell the client
+    // to send the password to /auth/setup-password instead.
+    if (user.mustChangePassword) {
+      throw new ForbiddenException({
+        code: 'MUST_CHANGE_PASSWORD',
+        message: 'Tenés que crear una nueva contraseña para continuar.',
+      });
+    }
 
     const clinic = await this.clinicModel.findById(user.clinicId).exec();
     if (!clinic) throw new UnauthorizedException('Consultorio no encontrado');
@@ -72,7 +222,25 @@ export class AuthService {
     user.lastLoginAt = new Date();
     await user.save();
 
+    // Single-session: revoke any other live refresh tokens this user has
+    // before minting the new one. The previous device will get a 401 the
+    // next time it pings the API and be redirected to /login.
+    await this.revokeOtherSessions(user._id as Types.ObjectId);
+
     return this.buildAuthResponse(user, clinic, ipAddress, userAgent);
+  }
+
+  // Single-session enforcement. Called on every fresh login (login,
+  // setupPassword, acceptInvitation) so only the latest device keeps a
+  // valid refresh token. Refresh-from-existing-token uses ROTATED instead
+  // and goes through the rotation path in refresh().
+  private async revokeOtherSessions(userId: Types.ObjectId): Promise<void> {
+    await this.refreshTokenModel
+      .updateMany(
+        { userId, revokedAt: null },
+        { revokedAt: new Date(), revokeReason: 'SESSION_REPLACED' },
+      )
+      .exec();
   }
 
   async refresh(rawToken: string, ipAddress?: string, userAgent?: string) {
@@ -91,7 +259,9 @@ export class AuthService {
     }
 
     if (!matched) {
-      // Could be a stolen token — check if it was already revoked
+      // No live match — check the revoked table to differentiate "the user
+      // just logged in elsewhere" from "someone is replaying a stolen
+      // token". Only the second one nukes every active session.
       const revokedCandidates = await this.refreshTokenModel
         .find({ revokedAt: { $ne: null } })
         .exec();
@@ -99,10 +269,21 @@ export class AuthService {
       for (const candidate of revokedCandidates) {
         const ok = await argon2.verify(candidate.tokenHash, rawToken);
         if (ok) {
-          // Token reuse detected — revoke all tokens for this user
+          if (candidate.revokeReason === 'SESSION_REPLACED') {
+            // Silent eviction — the user opened a new session somewhere
+            // else. Do NOT touch other tokens (the new device's token is
+            // still valid) and surface a specific code so the client can
+            // explain it.
+            throw new UnauthorizedException({
+              code: 'SESSION_REPLACED',
+              message: 'Tu sesión se cerró porque entraste desde otro dispositivo.',
+            });
+          }
+          // Genuine reuse of an already-rotated token — assume the token
+          // was stolen and burn every session for the user.
           await this.refreshTokenModel.updateMany(
-            { userId: candidate.userId },
-            { revokedAt: new Date() },
+            { userId: candidate.userId, revokedAt: null },
+            { revokedAt: new Date(), revokeReason: 'LOGOUT' },
           );
           throw new UnauthorizedException('Token reutilizado. Sesión revocada.');
         }
@@ -111,8 +292,10 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token inválido');
     }
 
-    // Revoke the used token
+    // Revoke the used token as a rotation — explicitly NOT a session swap,
+    // so the existing-token replay detection above keeps working.
     matched.revokedAt = new Date();
+    matched.revokeReason = 'ROTATED';
     await matched.save();
 
     const user = await this.userModel.findById(matched.userId).exec();
@@ -150,6 +333,7 @@ export class AuthService {
       const ok = await argon2.verify(candidate.tokenHash, rawToken);
       if (ok) {
         candidate.revokedAt = new Date();
+        candidate.revokeReason = 'LOGOUT';
         await candidate.save();
         return;
       }
@@ -199,6 +383,8 @@ export class AuthService {
     const clinic = await this.clinicModel.findById(invitation.clinicId).exec();
     if (!clinic) throw new NotFoundException('Consultorio no encontrado');
 
+    await this.revokeOtherSessions(user._id as Types.ObjectId);
+
     return this.buildAuthResponse(user, clinic, ipAddress, userAgent);
   }
 
@@ -222,10 +408,13 @@ export class AuthService {
     const rawRefreshToken = crypto.randomBytes(64).toString('hex');
     const tokenHash = await argon2.hash(rawRefreshToken);
 
+    // Refresh tokens are 24h on a sliding window: every refresh revokes the
+    // old token and mints a new one with a fresh 24h expiry. Configurable
+    // via JWT_USER_REFRESH_EXPIRES_IN (e.g. "7d" for a longer fallback).
     const expiresInDays =
       parseInt(
-        this.config.get('JWT_USER_REFRESH_EXPIRES_IN', '30d').replace('d', ''),
-      ) || 30;
+        this.config.get('JWT_USER_REFRESH_EXPIRES_IN', '1d').replace('d', ''),
+      ) || 1;
 
     await this.refreshTokenModel.create({
       userId: user._id,
@@ -253,6 +442,7 @@ export class AuthService {
         status: clinic.status,
         brandColor: clinic.brandColor,
         subscriptionEndsAt: clinic.subscriptionEndsAt ?? null,
+        trialEndsAt: clinic.trialEndsAt ?? null,
         isReadonly: isReadonly(clinic),
       },
     };
