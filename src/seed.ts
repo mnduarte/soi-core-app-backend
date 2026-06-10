@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { getModelToken } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
+import { Model, Connection } from 'mongoose';
 import * as argon2 from 'argon2';
 import { User, UserRole } from './modules/users/schemas/user.schema';
 import { Clinic, SubscriptionStatus } from './modules/clinics/schemas/clinic.schema';
@@ -119,11 +119,21 @@ async function seed() {
   const userModel = app.get<Model<User>>(getModelToken(User.name));
   const adminModel = app.get<Model<AdminUser>>(getModelToken(AdminUser.name));
 
+  // SEED_RESET=1 → vacía toda la base antes de sembrar (deja prod limpio).
+  if (process.env.SEED_RESET === '1') {
+    const connection = app.get<Connection>(getConnectionToken());
+    await connection.dropDatabase();
+    console.log('🧹 Database dropped (SEED_RESET=1)');
+  }
+
+  // SEED_ADMIN_ONLY=1 → no crea las clínicas demo, solo el super-admin.
+  const adminOnly = process.env.SEED_ADMIN_ONLY === '1';
+
   // Shared password for every seeded clinic OWNER.
   const sharedPassword = 'password123';
-  const sharedHash = await argon2.hash(sharedPassword);
+  const sharedHash = adminOnly ? '' : await argon2.hash(sharedPassword);
 
-  for (const seed of SEED_CLINICS) {
+  for (const seed of adminOnly ? [] : SEED_CLINICS) {
     let clinic = await clinicModel.findOne({ slug: seed.slug }).exec();
     if (!clinic) {
       clinic = await clinicModel.create({
@@ -166,25 +176,31 @@ async function seed() {
     }
   }
 
-  // Admin user
-  const adminEmail = 'admin@soi.com';
+  // Admin user. Credentials are env-overridable so production can be seeded
+  // with a strong password instead of the dev default.
+  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? 'admin@soi.com').toLowerCase();
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'admin123';
   let admin = await adminModel.findOne({ email: adminEmail }).exec();
   if (!admin) {
-    const passwordHash = await argon2.hash('admin123');
+    const passwordHash = await argon2.hash(adminPassword);
     admin = await adminModel.create({
       email: adminEmail,
       passwordHash,
       role: 'SUPERADMIN',
     });
-    console.log('✅ Admin user created:', adminEmail, '/ admin123');
+    console.log(
+      `✅ Admin user created: ${adminEmail} / ${process.env.SEED_ADMIN_PASSWORD ? '<from SEED_ADMIN_PASSWORD>' : 'admin123'}`,
+    );
   } else {
     console.log('ℹ️  Admin user already exists');
   }
 
   console.log('\n📋 Credenciales:');
-  console.log(`  Backoffice:  admin@soi.com   /  admin123       →  http://localhost:5174`);
-  console.log(`  Consultorio: <slug>          /  ${sharedPassword}    →  http://localhost:5173`);
-  console.log(`               (slugs: ${SEED_CLINICS.map(c => c.slug).join(', ')})`);
+  console.log(`  Backoffice:  ${adminEmail}   /  ${process.env.SEED_ADMIN_PASSWORD ? '<tu clave>' : 'admin123'}`);
+  if (!adminOnly) {
+    console.log(`  Consultorio: <slug>          /  ${sharedPassword}`);
+    console.log(`               (slugs: ${SEED_CLINICS.map(c => c.slug).join(', ')})`);
+  }
 
   await app.close();
 }
