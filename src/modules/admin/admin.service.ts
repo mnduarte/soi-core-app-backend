@@ -30,6 +30,7 @@ import {
   ExtendSubscriptionDto,
   RecordPaymentDto,
   UpdateAdminSettingsDto,
+  UpdateClinicDto,
   UpdateClinicSubscriptionDto,
 } from './dto/admin.dto';
 
@@ -278,6 +279,46 @@ export class AdminService {
         tempPassword,
       },
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edit clinic profile (name, doctor, branding) from the backoffice
+  // ---------------------------------------------------------------------------
+
+  async updateClinic(clinicId: string, dto: UpdateClinicDto) {
+    const clinic = await this.clinicModel
+      .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
+      .exec();
+    if (!clinic) throw new NotFoundException('Clínica no encontrada');
+
+    const fields = [
+      'name',
+      'doctorName',
+      'city',
+      'phone',
+      'contactEmail',
+      'brandColor',
+      'logoStyle',
+    ] as const;
+    for (const f of fields) {
+      if (dto[f] !== undefined) (clinic as unknown as Record<string, unknown>)[f] = dto[f];
+    }
+    clinic.updatedAt = new Date();
+    await clinic.save();
+
+    // Keep the OWNER's display name in sync with the doctor name so the
+    // dentist app greeting ("Buen día, Dr. X") matches what the admin sees.
+    if (dto.doctorName !== undefined) {
+      await this.userModel
+        .updateOne(
+          { clinicId: clinic._id, role: UserRole.OWNER, deletedAt: null },
+          { name: dto.doctorName },
+        )
+        .exec();
+    }
+
+    const settings = await this.getSettings();
+    return this.enrichClinic(clinic, settings.gracePeriodDays);
   }
 
   // ---------------------------------------------------------------------------

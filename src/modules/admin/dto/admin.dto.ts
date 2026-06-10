@@ -27,6 +27,38 @@ export class UpdateClinicSubscriptionDto {
   subscriptionEndsAt?: string;
 }
 
+// Body for PATCH /admin/clinics/:id — editar datos del consultorio desde el
+// backoffice (nombre, doctor, color, etc.). Todo opcional.
+export class UpdateClinicDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  doctorName?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsHexColor()
+  brandColor?: string;
+
+  @IsOptional()
+  @IsIn(['tooth', 'mono'])
+  logoStyle?: 'tooth' | 'mono';
+}
+
 export class CreateBannerDto {
   @IsString()
   title: string;

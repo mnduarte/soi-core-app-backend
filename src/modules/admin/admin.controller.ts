@@ -21,6 +21,7 @@ import {
   ExtendSubscriptionDto,
   RecordPaymentDto,
   UpdateAdminSettingsDto,
+  UpdateClinicDto,
   UpdateClinicSubscriptionDto,
 } from './dto/admin.dto';
 
@@ -68,6 +69,11 @@ export class AdminController {
   @Get('clinics/:id')
   findClinic(@Param('id') id: string) {
     return this.adminService.findClinicById(id);
+  }
+
+  @Patch('clinics/:id')
+  updateClinic(@Param('id') id: string, @Body() dto: UpdateClinicDto) {
+    return this.adminService.updateClinic(id, dto);
   }
 
   @Patch('clinics/:id/subscription')
