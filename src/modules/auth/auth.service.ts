@@ -45,6 +45,10 @@ function isFullyBlocked(clinic: Clinic): boolean {
   return false;
 }
 
+// How many devices can stay logged in at the same time per user. A 3rd login
+// evicts the oldest session, so a person's own laptop + phone coexist.
+const MAX_ACTIVE_SESSIONS = 2;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -129,8 +133,6 @@ export class AuthService {
     user.mustChangePassword = false;
     user.lastLoginAt = new Date();
     await user.save();
-
-    await this.revokeOtherSessions(user._id as Types.ObjectId);
 
     return this.buildAuthResponse(user, clinic, ipAddress, userAgent);
   }
@@ -222,22 +224,29 @@ export class AuthService {
     user.lastLoginAt = new Date();
     await user.save();
 
-    // Single-session: revoke any other live refresh tokens this user has
-    // before minting the new one. The previous device will get a 401 the
-    // next time it pings the API and be redirected to /login.
-    await this.revokeOtherSessions(user._id as Types.ObjectId);
-
     return this.buildAuthResponse(user, clinic, ipAddress, userAgent);
   }
 
-  // Single-session enforcement. Called on every fresh login (login,
-  // setupPassword, acceptInvitation) so only the latest device keeps a
-  // valid refresh token. Refresh-from-existing-token uses ROTATED instead
-  // and goes through the rotation path in refresh().
-  private async revokeOtherSessions(userId: Types.ObjectId): Promise<void> {
+  // Device cap. Instead of a hard single-session, we allow up to
+  // MAX_ACTIVE_SESSIONS live refresh tokens per user so one person can use
+  // their own laptop + phone without being bounced. When a new login pushes
+  // past the cap, the OLDEST sessions are evicted (SESSION_REPLACED) — the
+  // device you're actively using (newest token) is always kept. Called from
+  // buildAuthResponse after the new token exists. Cheap: one query per login,
+  // nothing per request.
+  private async enforceDeviceLimit(userId: Types.ObjectId): Promise<void> {
+    const live = await this.refreshTokenModel
+      .find({ userId, revokedAt: null })
+      .sort({ createdAt: -1 })
+      .select('_id')
+      .exec();
+
+    if (live.length <= MAX_ACTIVE_SESSIONS) return;
+
+    const excessIds = live.slice(MAX_ACTIVE_SESSIONS).map(t => t._id);
     await this.refreshTokenModel
       .updateMany(
-        { userId, revokedAt: null },
+        { _id: { $in: excessIds } },
         { revokedAt: new Date(), revokeReason: 'SESSION_REPLACED' },
       )
       .exec();
@@ -383,8 +392,6 @@ export class AuthService {
     const clinic = await this.clinicModel.findById(invitation.clinicId).exec();
     if (!clinic) throw new NotFoundException('Consultorio no encontrado');
 
-    await this.revokeOtherSessions(user._id as Types.ObjectId);
-
     return this.buildAuthResponse(user, clinic, ipAddress, userAgent);
   }
 
@@ -424,6 +431,9 @@ export class AuthService {
       userAgent,
       ipAddress,
     });
+
+    // Keep at most MAX_ACTIVE_SESSIONS devices logged in — evict the oldest.
+    await this.enforceDeviceLimit(user._id as Types.ObjectId);
 
     return {
       accessToken,
