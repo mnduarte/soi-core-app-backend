@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Req,
   UseGuards,
@@ -14,6 +15,8 @@ import { LookupDto } from './dto/lookup.dto';
 import { SetupPasswordDto } from './dto/setup-password.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
 import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
@@ -70,6 +73,14 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   logout(@Body('refreshToken') token: string) {
     return this.authService.logout(token);
+  }
+
+  // Polled by the core-app every ~30s to enforce suspension / session eviction
+  // near-real-time without WebSockets.
+  @Get('session-status')
+  @UseGuards(JwtAuthGuard)
+  sessionStatus(@CurrentUser() user: JwtPayload) {
+    return this.authService.sessionStatus(user);
   }
 
   @Post('accept-invitation')

@@ -6,6 +6,10 @@ export interface JwtPayload {
   clinicId: string;
   role: string;
   isClinical: boolean;
+  // Session id = the refresh token's _id. Lets the session-status poll detect
+  // when this device's session was evicted (device cap / logout). Optional for
+  // backwards compatibility with tokens issued before it existed.
+  sid?: string;
 }
 
 export const CurrentUser = createParamDecorator(

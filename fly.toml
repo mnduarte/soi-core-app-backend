@@ -2,7 +2,7 @@
 # The app name is picked at first `fly launch` — replace `<APP_NAME>` then.
 # Region: gru = São Paulo (closest to AR / lowest LATAM latency on Fly).
 
-app = "<APP_NAME>"
+app = "soi-core-api"
 primary_region = "gru"
 
 [build]

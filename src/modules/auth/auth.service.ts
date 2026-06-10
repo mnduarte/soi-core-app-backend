@@ -26,6 +26,7 @@ import {
   PasswordResetRequestDocument,
 } from '../admin/schemas/password-reset-request.schema';
 import { TelegramService } from '../admin/telegram.service';
+import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { addDays } from 'date-fns';
 
 function isReadonly(clinic: Clinic): boolean {
@@ -125,6 +126,10 @@ export class AuthService {
 
     const clinic = await this.clinicModel.findById(user.clinicId).exec();
     if (!clinic) throw new UnauthorizedException('Consultorio no encontrado');
+    if (clinic.status === SubscriptionStatus.SUSPENDED) {
+      throw new ForbiddenException('La cuenta está suspendida. Contactá al administrador.');
+    }
+
     if (isFullyBlocked(clinic)) {
       throw new ForbiddenException('La suscripción venció.');
     }
@@ -214,6 +219,12 @@ export class AuthService {
 
     const clinic = await this.clinicModel.findById(user.clinicId).exec();
     if (!clinic) throw new UnauthorizedException('Consultorio no encontrado');
+
+    if (clinic.status === SubscriptionStatus.SUSPENDED) {
+      throw new ForbiddenException(
+        'La cuenta está suspendida. Contactá al administrador.',
+      );
+    }
 
     if (isFullyBlocked(clinic)) {
       throw new ForbiddenException(
@@ -313,6 +324,10 @@ export class AuthService {
     const clinic = await this.clinicModel.findById(matched.clinicId).exec();
     if (!clinic) throw new UnauthorizedException();
 
+    if (clinic.status === SubscriptionStatus.SUSPENDED) {
+      throw new ForbiddenException('La cuenta está suspendida. Contactá al administrador.');
+    }
+
     if (isFullyBlocked(clinic)) {
       throw new ForbiddenException('La suscripción venció.');
     }
@@ -347,6 +362,30 @@ export class AuthService {
         return;
       }
     }
+  }
+
+  // Lightweight poll target. The core-app calls this every ~30s so suspension
+  // and session eviction take effect quickly without per-request cost or
+  // WebSockets. Returns ok:false + a reason the client maps to a message.
+  async sessionStatus(
+    user: JwtPayload,
+  ): Promise<{ ok: boolean; reason?: 'SUSPENDED' | 'EXPIRED' | 'SESSION_REPLACED' | 'BLOCKED' }> {
+    const clinic = await this.clinicModel.findById(user.clinicId).exec();
+    if (!clinic || clinic.deletedAt) return { ok: false, reason: 'BLOCKED' };
+    if (clinic.status === SubscriptionStatus.SUSPENDED) return { ok: false, reason: 'SUSPENDED' };
+    if (isFullyBlocked(clinic)) return { ok: false, reason: 'EXPIRED' };
+
+    // Session eviction (device cap / logout). Only checkable when the token
+    // carries a sid (issued after the feature shipped).
+    if (user.sid) {
+      const session = await this.refreshTokenModel
+        .findById(user.sid)
+        .select('revokedAt')
+        .exec();
+      if (!session || session.revokedAt) return { ok: false, reason: 'SESSION_REPLACED' };
+    }
+
+    return { ok: true };
   }
 
   async acceptInvitation(dto: AcceptInvitationDto, ipAddress?: string, userAgent?: string) {
@@ -401,17 +440,8 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const payload = {
-      sub: (user._id as Types.ObjectId).toString(),
-      email: user.email,
-      clinicId: (user.clinicId as Types.ObjectId).toString(),
-      role: user.role,
-      isClinical: user.isClinical,
-    };
-
-    const accessToken = this.jwtService.sign(payload);
-
-    // Generate raw refresh token and store its hash
+    // Generate raw refresh token and store its hash FIRST, so its _id can be
+    // embedded as the session id (sid) in the access token.
     const rawRefreshToken = crypto.randomBytes(64).toString('hex');
     const tokenHash = await argon2.hash(rawRefreshToken);
 
@@ -423,13 +453,22 @@ export class AuthService {
         this.config.get('JWT_USER_REFRESH_EXPIRES_IN', '1d').replace('d', ''),
       ) || 1;
 
-    await this.refreshTokenModel.create({
+    const refreshDoc = await this.refreshTokenModel.create({
       userId: user._id,
       clinicId: user.clinicId,
       tokenHash,
       expiresAt: addDays(new Date(), expiresInDays),
       userAgent,
       ipAddress,
+    });
+
+    const accessToken = this.jwtService.sign({
+      sub: (user._id as Types.ObjectId).toString(),
+      email: user.email,
+      clinicId: (user.clinicId as Types.ObjectId).toString(),
+      role: user.role,
+      isClinical: user.isClinical,
+      sid: (refreshDoc._id as Types.ObjectId).toString(),
     });
 
     // Keep at most MAX_ACTIVE_SESSIONS devices logged in — evict the oldest.
