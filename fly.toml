@@ -14,11 +14,12 @@ primary_region = "gru"
   internal_port = 3000
   force_https = true
   # Machines stop after a few minutes idle and auto-wake on the next
-  # request. Free-tier friendly — adds ~1s of latency on cold starts.
-  # Set min_machines_running = 1 if cold starts ever become unacceptable.
+  # Keep 1 machine always running so there are no cold starts (the first
+  # request of the day is instant). Extra machines above the minimum still
+  # auto-stop when idle. Costs ~1 always-on shared-cpu-1x machine (~$2/mo).
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["app"]
 
   [[http_service.checks]]
