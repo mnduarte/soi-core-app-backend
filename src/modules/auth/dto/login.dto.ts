@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 // Login accepts either email or username. `identifier` is the canonical field
 // for new clients; `email` is kept as an alias so older `core-app-frontend`
@@ -12,7 +12,8 @@ export class LoginDto {
   @IsString()
   email?: string;
 
+  // No length rule here on purpose: at login any wrong/short password should
+  // just come back as "Credenciales inválidas", not a validation error.
   @IsString()
-  @MinLength(6)
   password: string;
 }
