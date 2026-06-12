@@ -27,6 +27,7 @@ import {
 import {
   CreateBannerDto,
   CreateClinicAccountDto,
+  CreateClinicUserDto,
   ExtendSubscriptionDto,
   RecordPaymentDto,
   UpdateAdminSettingsDto,
@@ -422,6 +423,111 @@ export class AdminService {
       .exec();
 
     return { tempPassword };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clinic users — list / create / reset / deactivate (backoffice managed).
+  // A clinic can have N users (1 OWNER + N MEMBER). Usernames are unique
+  // GLOBALLY because login resolves the clinic from the username.
+  // ---------------------------------------------------------------------------
+
+  async listClinicUsers(clinicId: string) {
+    const users = await this.userModel
+      .find({ clinicId: new Types.ObjectId(clinicId), deletedAt: null })
+      .sort({ role: 1, createdAt: 1 })
+      .exec();
+    return users.map(u => ({
+      _id: (u._id as Types.ObjectId).toString(),
+      name: u.name,
+      username: u.username ?? null,
+      role: u.role,
+      isClinical: u.isClinical,
+      lastLoginAt: u.lastLoginAt ?? null,
+      mustChangePassword: u.mustChangePassword,
+    }));
+  }
+
+  async createClinicUser(clinicId: string, dto: CreateClinicUserDto) {
+    const clinic = await this.clinicModel
+      .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
+      .exec();
+    if (!clinic) throw new NotFoundException('Clínica no encontrada');
+
+    const username = slugify(dto.username);
+    if (!username) throw new BadRequestException('Usuario inválido');
+
+    // Global uniqueness — the login looks users up by username across clinics.
+    const taken = await this.userModel.exists({ username, deletedAt: null });
+    if (taken) throw new BadRequestException('Ese usuario ya está en uso');
+
+    const tempPassword = generateTempPassword();
+    const passwordHash = await argon2.hash(tempPassword);
+
+    const user = await this.userModel.create({
+      clinicId: clinic._id,
+      // Synthetic email keeps the (clinicId, email) unique index satisfied.
+      email: `${username}@molar.local`,
+      username,
+      passwordHash,
+      name: dto.name,
+      role: dto.role === 'OWNER' ? UserRole.OWNER : UserRole.MEMBER,
+      isClinical: dto.isClinical ?? true,
+      mustChangePassword: true,
+    });
+
+    return {
+      user: {
+        _id: (user._id as Types.ObjectId).toString(),
+        name: user.name,
+        username,
+        role: user.role,
+        isClinical: user.isClinical,
+      },
+      tempPassword,
+    };
+  }
+
+  async resetUserPassword(clinicId: string, userId: string) {
+    const user = await this.userModel
+      .findOne({
+        _id: new Types.ObjectId(userId),
+        clinicId: new Types.ObjectId(clinicId),
+        deletedAt: null,
+      })
+      .exec();
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const tempPassword = generateTempPassword();
+    user.passwordHash = await argon2.hash(tempPassword);
+    user.mustChangePassword = true;
+    await user.save();
+
+    // Close any pending reset requests for this clinic.
+    await this.resetRequestModel
+      .updateMany(
+        { clinicId: new Types.ObjectId(clinicId), resolvedAt: null },
+        { resolvedAt: new Date() },
+      )
+      .exec();
+
+    return { username: user.username ?? null, tempPassword };
+  }
+
+  async deactivateClinicUser(clinicId: string, userId: string) {
+    const user = await this.userModel
+      .findOne({
+        _id: new Types.ObjectId(userId),
+        clinicId: new Types.ObjectId(clinicId),
+        deletedAt: null,
+      })
+      .exec();
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (user.role === UserRole.OWNER) {
+      throw new BadRequestException('No se puede eliminar al titular (OWNER) de la clínica');
+    }
+    user.deletedAt = new Date();
+    await user.save();
+    return { ok: true };
   }
 
   // ---------------------------------------------------------------------------

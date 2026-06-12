@@ -18,6 +18,7 @@ import { AdminService } from './admin.service';
 import {
   CreateBannerDto,
   CreateClinicAccountDto,
+  CreateClinicUserDto,
   ExtendSubscriptionDto,
   RecordPaymentDto,
   UpdateAdminSettingsDto,
@@ -104,6 +105,28 @@ export class AdminController {
   @Post('clinics/:id/reset-credentials')
   resetCredentials(@Param('id') id: string) {
     return this.adminService.resetCredentials(id);
+  }
+
+  // ---- Usuarios de la clínica (N por clínica) ----
+
+  @Get('clinics/:id/users')
+  listClinicUsers(@Param('id') id: string) {
+    return this.adminService.listClinicUsers(id);
+  }
+
+  @Post('clinics/:id/users')
+  createClinicUser(@Param('id') id: string, @Body() dto: CreateClinicUserDto) {
+    return this.adminService.createClinicUser(id, dto);
+  }
+
+  @Post('clinics/:id/users/:userId/reset-password')
+  resetUserPassword(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.adminService.resetUserPassword(id, userId);
+  }
+
+  @Delete('clinics/:id/users/:userId')
+  deactivateClinicUser(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.adminService.deactivateClinicUser(id, userId);
   }
 
   @Post('clinics/:id/impersonate')

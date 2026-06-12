@@ -164,3 +164,22 @@ export class UpdateAdminSettingsDto {
   @Min(1)
   trialDays?: number;
 }
+
+// Alta de un usuario adicional dentro de una clínica (desde el backoffice).
+// El username debe ser único global porque el login resuelve la clínica a
+// partir de él. La contraseña se genera temporal (mustChangePassword).
+export class CreateClinicUserDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  username: string;
+
+  @IsOptional()
+  @IsIn(['OWNER', 'MEMBER'])
+  role?: 'OWNER' | 'MEMBER';
+
+  @IsOptional()
+  @IsBoolean()
+  isClinical?: boolean;
+}
