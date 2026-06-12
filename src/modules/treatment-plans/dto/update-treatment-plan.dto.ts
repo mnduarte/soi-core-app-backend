@@ -11,8 +11,8 @@ export class UpdateTreatmentItemDto {
   description?: string;
 
   @IsOptional()
-  @IsNumber()
-  toothNumber?: number;
+  @IsString()
+  toothNumber?: string;
 
   @IsOptional()
   @IsString()
@@ -37,8 +37,8 @@ export class AddTreatmentItemDto {
   description: string;
 
   @IsOptional()
-  @IsNumber()
-  toothNumber?: number;
+  @IsString()
+  toothNumber?: string;
 
   @IsOptional()
   @IsString()

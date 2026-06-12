@@ -7,8 +7,8 @@ export class CreateTreatmentItemDto {
   description: string;
 
   @IsOptional()
-  @IsNumber()
-  toothNumber?: number;
+  @IsString()
+  toothNumber?: string;
 
   @IsOptional()
   @IsString()

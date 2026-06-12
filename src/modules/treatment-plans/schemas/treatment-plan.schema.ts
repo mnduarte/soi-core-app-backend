@@ -28,8 +28,10 @@ export class TreatmentItem {
   @Prop({ required: true })
   description: string;
 
+  // Free text: one tooth (FDI), several ("16, 24"), or a group
+  // ("anterosuperiores"). Stored as a label, not validated as a number.
   @Prop()
-  toothNumber?: number;
+  toothNumber?: string;
 
   @Prop()
   surface?: string;
