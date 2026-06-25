@@ -17,11 +17,18 @@ import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { ScanFichaDto } from './dto/scan-ficha.dto';
 
 @Controller('patients')
 @UseGuards(JwtAuthGuard)
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
+
+  // Read a paper record photo → extracted fields + possible existing match.
+  @Post('scan')
+  scanFicha(@ClinicId() clinicId: string, @Body() dto: ScanFichaDto) {
+    return this.patientsService.scanFicha(clinicId, dto);
+  }
 
   @Post()
   create(

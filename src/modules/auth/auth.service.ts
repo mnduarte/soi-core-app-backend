@@ -93,6 +93,7 @@ export class AuthService {
     return {
       exists: true,
       displayName: user.name,
+      title: user.title ?? null,
       mustChangePassword: user.mustChangePassword === true,
       clinic: clinic
         ? {
@@ -481,6 +482,7 @@ export class AuthService {
         id: (user._id as Types.ObjectId).toString(),
         email: user.email,
         name: user.name,
+        title: user.title ?? null,
         role: user.role,
         isClinical: user.isClinical,
         clinicalProfile: user.clinicalProfile,

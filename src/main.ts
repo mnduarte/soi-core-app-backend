@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -21,7 +22,11 @@ function parseAllowedOrigins(): string[] {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Allow larger JSON bodies — the "scan ficha" feature posts a base64 image
+  // (a downscaled photo is a few hundred KB, well over the 100kb default).
+  app.useBodyParser('json', { limit: '12mb' });
 
   app.enableCors({
     origin: parseAllowedOrigins(),

@@ -9,6 +9,14 @@ export enum UserRole {
   MEMBER = 'MEMBER',
 }
 
+// Honorific shown before the name in the UI (login greeting + sidebar).
+// ASSISTANT → no prefix. Set per user from the backoffice.
+export enum UserTitle {
+  DR = 'DR',
+  DRA = 'DRA',
+  NONE = 'NONE',
+}
+
 export class ClinicalProfile {
   @Prop()
   license?: string;
@@ -39,6 +47,9 @@ export class User extends BaseEntity {
 
   @Prop({ required: true })
   name: string;
+
+  @Prop({ enum: UserTitle, default: UserTitle.NONE })
+  title: UserTitle;
 
   @Prop({ enum: UserRole, default: UserRole.MEMBER })
   role: UserRole;

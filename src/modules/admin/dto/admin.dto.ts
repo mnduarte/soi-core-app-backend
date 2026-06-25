@@ -133,6 +133,11 @@ export class CreateClinicAccountDto {
   @IsOptional()
   @IsIn(['tooth', 'mono'])
   logoStyle?: 'tooth' | 'mono';
+
+  // Tratamiento del doctor a cargo: Dr. / Dra. / (asistente = sin prefijo).
+  @IsOptional()
+  @IsIn(['DR', 'DRA', 'NONE'])
+  doctorTitle?: 'DR' | 'DRA' | 'NONE';
 }
 
 export class ExtendSubscriptionDto {
@@ -182,4 +187,8 @@ export class CreateClinicUserDto {
   @IsOptional()
   @IsBoolean()
   isClinical?: boolean;
+
+  @IsOptional()
+  @IsIn(['DR', 'DRA', 'NONE'])
+  title?: 'DR' | 'DRA' | 'NONE';
 }

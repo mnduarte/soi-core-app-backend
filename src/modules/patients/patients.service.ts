@@ -8,13 +8,60 @@ import { Model, Types } from 'mongoose';
 import { Patient, PatientDocument } from './schemas/patient.schema';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { ScanFichaDto } from './dto/scan-ficha.dto';
+import { FichaScanService } from './ficha-scan.service';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 @Injectable()
 export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
+    private readonly fichaScan: FichaScanService,
   ) {}
+
+  // Reads a paper record photo, returns the extracted fields plus a possible
+  // existing patient match (by DNI → phone → name+lastName, scoped to the
+  // clinic) so the UI can warn before a duplicate is created.
+  async scanFicha(clinicId: string, dto: ScanFichaDto) {
+    const extracted = await this.fichaScan.extract(dto.image, dto.mediaType);
+    const cid = new Types.ObjectId(clinicId);
+
+    let match: { _id: Types.ObjectId; name: string; lastName: string } | null = null;
+    if (extracted.dni) {
+      match = await this.patientModel
+        .findOne({ clinicId: cid, dni: extracted.dni, deletedAt: null })
+        .select('_id name lastName')
+        .lean();
+    }
+    if (!match && extracted.phone) {
+      match = await this.patientModel
+        .findOne({ clinicId: cid, phone: extracted.phone, deletedAt: null })
+        .select('_id name lastName')
+        .lean();
+    }
+    if (!match && extracted.name && extracted.lastName) {
+      match = await this.patientModel
+        .findOne({
+          clinicId: cid,
+          name: new RegExp(`^${escapeRegex(extracted.name)}$`, 'i'),
+          lastName: new RegExp(`^${escapeRegex(extracted.lastName)}$`, 'i'),
+          deletedAt: null,
+        })
+        .select('_id name lastName')
+        .lean();
+    }
+
+    return {
+      extracted,
+      existing: match
+        ? { _id: match._id.toString(), name: match.name, lastName: match.lastName }
+        : null,
+    };
+  }
 
   async create(clinicId: string, dto: CreatePatientDto, requester: JwtPayload) {
     if (dto.dni) {

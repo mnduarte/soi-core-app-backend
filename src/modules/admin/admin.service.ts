@@ -13,7 +13,7 @@ import {
   ClinicDocument,
   SubscriptionStatus,
 } from '../clinics/schemas/clinic.schema';
-import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
+import { User, UserDocument, UserRole, UserTitle } from '../users/schemas/user.schema';
 import { Banner, BannerDocument } from '../banners/schemas/banner.schema';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import {
@@ -266,6 +266,7 @@ export class AdminService {
       username: slug,
       passwordHash,
       name: dto.doctorName,
+      title: (dto.doctorTitle as UserTitle) ?? UserTitle.NONE,
       role: UserRole.OWNER,
       isClinical: true,
       mustChangePassword: true,
@@ -440,6 +441,7 @@ export class AdminService {
       _id: (u._id as Types.ObjectId).toString(),
       name: u.name,
       username: u.username ?? null,
+      title: u.title ?? UserTitle.NONE,
       role: u.role,
       isClinical: u.isClinical,
       lastLoginAt: u.lastLoginAt ?? null,
@@ -470,6 +472,7 @@ export class AdminService {
       username,
       passwordHash,
       name: dto.name,
+      title: (dto.title as UserTitle) ?? UserTitle.NONE,
       role: dto.role === 'OWNER' ? UserRole.OWNER : UserRole.MEMBER,
       isClinical: dto.isClinical ?? true,
       mustChangePassword: true,
