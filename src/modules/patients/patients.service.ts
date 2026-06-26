@@ -25,42 +25,61 @@ export class PatientsService {
 
   // Reads a paper record photo, returns the extracted fields plus a possible
   // existing patient match (by DNI → phone → name+lastName, scoped to the
-  // clinic) so the UI can warn before a duplicate is created.
+  // clinic). Matches ACTIVE patients first; if none, looks among SOFT-DELETED
+  // ones so the UI can offer to restore (with full history) instead of creating
+  // a duplicate. `deleted` flags which case it is.
   async scanFicha(clinicId: string, dto: ScanFichaDto) {
     const extracted = await this.fichaScan.extract(dto.image, dto.mediaType);
     const cid = new Types.ObjectId(clinicId);
 
-    let match: { _id: Types.ObjectId; name: string; lastName: string } | null = null;
-    if (extracted.dni) {
-      match = await this.patientModel
-        .findOne({ clinicId: cid, dni: extracted.dni, deletedAt: null })
+    const findMatch = async (q: Record<string, unknown>) => {
+      const active = await this.patientModel
+        .findOne({ clinicId: cid, ...q, deletedAt: null })
         .select('_id name lastName')
         .lean();
-    }
-    if (!match && extracted.phone) {
-      match = await this.patientModel
-        .findOne({ clinicId: cid, phone: extracted.phone, deletedAt: null })
+      if (active) return { ...active, deleted: false };
+      const deleted = await this.patientModel
+        .findOne({ clinicId: cid, ...q, deletedAt: { $ne: null } })
         .select('_id name lastName')
         .lean();
-    }
+      if (deleted) return { ...deleted, deleted: true };
+      return null;
+    };
+
+    let match: { _id: Types.ObjectId; name: string; lastName: string; deleted: boolean } | null = null;
+    if (extracted.dni) match = await findMatch({ dni: extracted.dni });
+    if (!match && extracted.phone) match = await findMatch({ phone: extracted.phone });
     if (!match && extracted.name && extracted.lastName) {
-      match = await this.patientModel
-        .findOne({
-          clinicId: cid,
-          name: new RegExp(`^${escapeRegex(extracted.name)}$`, 'i'),
-          lastName: new RegExp(`^${escapeRegex(extracted.lastName)}$`, 'i'),
-          deletedAt: null,
-        })
-        .select('_id name lastName')
-        .lean();
+      match = await findMatch({
+        name: new RegExp(`^${escapeRegex(extracted.name)}$`, 'i'),
+        lastName: new RegExp(`^${escapeRegex(extracted.lastName)}$`, 'i'),
+      });
     }
 
     return {
       extracted,
       existing: match
-        ? { _id: match._id.toString(), name: match.name, lastName: match.lastName }
+        ? {
+            _id: match._id.toString(),
+            name: match.name,
+            lastName: match.lastName,
+            deleted: match.deleted,
+          }
         : null,
     };
+  }
+
+  // Revive a soft-deleted patient (keeps all its history). Looks it up without
+  // the deletedAt:null filter on purpose.
+  async restore(clinicId: string, patientId: string) {
+    const patient = await this.patientModel
+      .findOne({ _id: new Types.ObjectId(patientId), clinicId: new Types.ObjectId(clinicId) })
+      .exec();
+    if (!patient) throw new NotFoundException('Paciente no encontrado');
+    await this.patientModel
+      .updateOne({ _id: patient._id }, { $unset: { deletedAt: '', deletedBy: '' } })
+      .exec();
+    return { ok: true };
   }
 
   async create(clinicId: string, dto: CreatePatientDto, requester: JwtPayload) {

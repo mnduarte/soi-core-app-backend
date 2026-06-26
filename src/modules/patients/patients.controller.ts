@@ -71,4 +71,10 @@ export class PatientsController {
   ) {
     return this.patientsService.softDelete(clinicId, id, user);
   }
+
+  // Revive a soft-deleted patient (with all its history).
+  @Post(':id/restore')
+  restore(@ClinicId() clinicId: string, @Param('id') id: string) {
+    return this.patientsService.restore(clinicId, id);
+  }
 }
