@@ -5,6 +5,9 @@ import {
   IsDateString,
   IsBoolean,
   IsArray,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 
 export class MedicalHistoryDto {
@@ -42,6 +45,12 @@ export class CreatePatientDto {
   @IsOptional()
   @IsDateString()
   birthDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(130)
+  age?: number;
 
   @IsOptional()
   @IsString()

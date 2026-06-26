@@ -18,8 +18,13 @@ export class Patient extends BaseEntity {
   @Prop()
   dni?: string;
 
+  // Fecha de nacimiento queda para datos históricos / lectura de fichas viejas,
+  // pero la carga rápida del consultorio usa `age` (el doctor tipea la edad).
   @Prop()
   birthDate?: Date;
+
+  @Prop()
+  age?: number;
 
   @Prop()
   phone?: string;

@@ -13,6 +13,7 @@ export interface ExtractedPatient {
   name?: string;
   lastName?: string;
   birthDate?: string;
+  age?: string;
   dni?: string;
   phone?: string;
   email?: string;
@@ -31,6 +32,7 @@ Respondé ÚNICAMENTE con un objeto JSON (sin texto antes ni después, sin bloqu
   "name": "nombre de pila",
   "lastName": "apellido",
   "birthDate": "fecha de nacimiento en formato YYYY-MM-DD",
+  "age": "edad en años, solo el número (si la ficha tiene la edad escrita)",
   "dni": "documento, solo números",
   "phone": "teléfono",
   "email": "email",
@@ -123,6 +125,7 @@ export class FichaScanService {
       'name',
       'lastName',
       'birthDate',
+      'age',
       'dni',
       'phone',
       'email',
