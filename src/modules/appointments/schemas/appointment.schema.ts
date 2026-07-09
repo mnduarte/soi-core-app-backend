@@ -25,8 +25,14 @@ export class Appointment extends BaseEntity {
   @Prop({ required: true, type: Types.ObjectId, ref: 'Clinic' })
   clinicId: Types.ObjectId;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'Patient' })
-  patientId: Types.ObjectId;
+  // Opcional: en la "libreta" el turno puede anotarse con solo un nombre suelto
+  // (paciente sin ficha todavía). Si está vinculado a una ficha, va patientId;
+  // patientName guarda igual la etiqueta escrita/elegida para mostrar rápido.
+  @Prop({ type: Types.ObjectId, ref: 'Patient' })
+  patientId?: Types.ObjectId;
+
+  @Prop()
+  patientName?: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   professionalId?: Types.ObjectId;

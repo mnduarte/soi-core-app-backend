@@ -59,10 +59,8 @@ export class Patient extends BaseEntity {
 export const PatientSchema = SchemaFactory.createForClass(Patient);
 
 PatientSchema.index({ clinicId: 1, deletedAt: 1 });
-PatientSchema.index(
-  { clinicId: 1, dni: 1 },
-  { unique: true, sparse: true, partialFilterExpression: { deletedAt: null, dni: { $exists: true } } },
-);
+// DNI: índice no único (se permiten duplicados; se reconcilian desde la lista).
+PatientSchema.index({ clinicId: 1, dni: 1 });
 PatientSchema.index(
   { clinicId: 1, name: 'text', lastName: 'text', dni: 'text', phone: 'text', email: 'text' },
   { name: 'patient_text_search' },

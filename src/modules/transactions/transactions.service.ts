@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Transaction, TransactionDocument, TransactionType } from './schemas/transaction.schema';
-import { CreateTransactionDto } from './dto/transaction.dto';
+import { CreateTransactionDto, UpdateTransactionDto } from './dto/transaction.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
@@ -27,8 +27,39 @@ export class TransactionsService {
       amount: dto.amount,
       paymentMethod: dto.paymentMethod,
       description: dto.description,
+      date: dto.date ? new Date(dto.date) : new Date(),
       createdBy: new Types.ObjectId(requester.sub),
     });
+  }
+
+  // Editar un movimiento de la cuenta corriente (ficha rápida). Solo aplica a
+  // CHARGE/PAYMENT; los internos (REFUND/VOID) no se editan.
+  async update(clinicId: string, transactionId: string, dto: UpdateTransactionDto, requester: JwtPayload) {
+    const tx = await this.transactionModel
+      .findOne({ _id: new Types.ObjectId(transactionId), clinicId: new Types.ObjectId(clinicId) })
+      .exec();
+    if (!tx) throw new NotFoundException('Movimiento no encontrado');
+    if (tx.type !== TransactionType.CHARGE && tx.type !== TransactionType.PAYMENT) {
+      throw new BadRequestException('Este movimiento no se puede editar');
+    }
+    if (dto.type === TransactionType.CHARGE || dto.type === TransactionType.PAYMENT) {
+      tx.type = dto.type;
+    }
+    if (dto.amount != null) tx.amount = dto.amount;
+    if (dto.paymentMethod != null) tx.paymentMethod = dto.paymentMethod;
+    if (dto.description != null) tx.description = dto.description;
+    if (dto.date) tx.date = new Date(dto.date);
+    tx.updatedBy = new Types.ObjectId(requester.sub);
+    return tx.save();
+  }
+
+  // Borrado físico (la ficha rápida borra como se tacha en el cuaderno).
+  async hardDelete(clinicId: string, transactionId: string) {
+    const res = await this.transactionModel
+      .deleteOne({ _id: new Types.ObjectId(transactionId), clinicId: new Types.ObjectId(clinicId) })
+      .exec();
+    if (res.deletedCount === 0) throw new NotFoundException('Movimiento no encontrado');
+    return { ok: true };
   }
 
   async findAll(clinicId: string, patientId?: string) {

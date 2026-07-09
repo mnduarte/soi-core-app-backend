@@ -45,4 +45,14 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsString()
   whatsappTemplate?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  quickAmounts?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  quickTreatments?: string[];
 }

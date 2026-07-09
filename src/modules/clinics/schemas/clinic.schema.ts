@@ -37,6 +37,15 @@ export class ClinicSettings {
   @Prop({ type: Object, default: { whatsapp: '' } })
   reminderTemplates: { whatsapp: string };
 
+  // Montos rápidos de la Ficha rápida, personalizables por consultorio.
+  @Prop({ type: [Number], default: [] })
+  quickAmounts: number[];
+
+  // Trabajos/prestaciones rápidas (chips), compartidas por la Agenda (Trabajo)
+  // y la Ficha rápida (Prestación). Personalizables por consultorio.
+  @Prop({ type: [String], default: [] })
+  quickTreatments: string[];
+
   @Prop()
   logoUrl?: string;
 }

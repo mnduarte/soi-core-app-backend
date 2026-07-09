@@ -70,4 +70,11 @@ export class AppointmentsController {
   ) {
     return this.appointmentsService.softDelete(clinicId, id, user);
   }
+
+  // Borrado físico del turno (la libreta lo usa para corregir errores de carga).
+  @Delete(':id/hard')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  hardRemove(@ClinicId() clinicId: string, @Param('id') id: string) {
+    return this.appointmentsService.hardDelete(clinicId, id);
+  }
 }

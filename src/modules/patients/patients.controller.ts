@@ -77,4 +77,11 @@ export class PatientsController {
   restore(@ClinicId() clinicId: string, @Param('id') id: string) {
     return this.patientsService.restore(clinicId, id);
   }
+
+  // Borrado físico + cascade (limpiar duplicados). Irreversible.
+  @Delete(':id/hard')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  hardRemove(@ClinicId() clinicId: string, @Param('id') id: string) {
+    return this.patientsService.hardDelete(clinicId, id);
+  }
 }

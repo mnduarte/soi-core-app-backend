@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -13,7 +15,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { TransactionsService } from './transactions.service';
-import { CreateTransactionDto } from './dto/transaction.dto';
+import { CreateTransactionDto, UpdateTransactionDto } from './dto/transaction.dto';
 
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
@@ -47,5 +49,21 @@ export class TransactionsController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.transactionsService.void(clinicId, id, user);
+  }
+
+  @Patch(':id')
+  update(
+    @ClinicId() clinicId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateTransactionDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.transactionsService.update(clinicId, id, dto, user);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@ClinicId() clinicId: string, @Param('id') id: string) {
+    return this.transactionsService.hardDelete(clinicId, id);
   }
 }

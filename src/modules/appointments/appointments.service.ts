@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -18,7 +19,17 @@ export class AppointmentsService {
     @InjectClinicModel(Clinic.name) private clinicModel: Model<ClinicDocument>,
   ) {}
 
-  private async checkOverlap(clinicId: string, startsAt: Date, endsAt: Date, excludeId?: string) {
+  private async checkOverlap(
+    clinicId: string,
+    startsAt: Date,
+    endsAt: Date,
+    excludeId?: string,
+    allowOverlap?: boolean,
+  ) {
+    // El sobreturno confirmado (allowOverlap) o el flag de la clínica saltean el
+    // chequeo: la libreta necesita poder apilar varios turnos en el mismo horario.
+    if (allowOverlap) return;
+
     const clinic = await this.clinicModel
       .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
       .select('settings')
@@ -43,14 +54,19 @@ export class AppointmentsService {
   }
 
   async create(clinicId: string, dto: CreateAppointmentDto, requester: JwtPayload) {
+    if (!dto.patientId && !dto.patientName?.trim()) {
+      throw new BadRequestException('Falta el paciente o un nombre para el turno');
+    }
+
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
 
-    await this.checkOverlap(clinicId, startsAt, endsAt);
+    await this.checkOverlap(clinicId, startsAt, endsAt, undefined, dto.allowOverlap);
 
     return this.appointmentModel.create({
       clinicId: new Types.ObjectId(clinicId),
-      patientId: new Types.ObjectId(dto.patientId),
+      patientId: dto.patientId ? new Types.ObjectId(dto.patientId) : undefined,
+      patientName: dto.patientName?.trim() || undefined,
       professionalId: dto.professionalId ? new Types.ObjectId(dto.professionalId) : undefined,
       startsAt,
       endsAt,
@@ -104,6 +120,7 @@ export class AppointmentsService {
       ...dto,
       startsAt,
       endsAt,
+      patientId: dto.patientId ? new Types.ObjectId(dto.patientId) : appointment.patientId,
       professionalId: dto.professionalId ? new Types.ObjectId(dto.professionalId) : appointment.professionalId,
     });
 
@@ -141,5 +158,19 @@ export class AppointmentsService {
     appointment.deletedAt = new Date();
     appointment.deletedBy = new Types.ObjectId(requester.sub);
     return appointment.save();
+  }
+
+  // Borrado físico. A diferencia del resto del sistema (soft delete), un turno
+  // es dato de agenda efímero: si el usuario se equivoca al anotar, lo borra y
+  // listo (lo puede volver a crear). Decisión de producto explícita.
+  async hardDelete(clinicId: string, appointmentId: string) {
+    const res = await this.appointmentModel
+      .deleteOne({
+        _id: new Types.ObjectId(appointmentId),
+        clinicId: new Types.ObjectId(clinicId),
+      })
+      .exec();
+    if (res.deletedCount === 0) throw new NotFoundException('Turno no encontrado');
+    return { ok: true };
   }
 }

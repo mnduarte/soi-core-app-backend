@@ -40,6 +40,11 @@ export class Transaction extends BaseEntity {
   @Prop()
   description?: string;
 
+  // Fecha del movimiento en la cuenta corriente. Puede ser distinta de createdAt
+  // (la ficha del Dr. tiene movimientos con fechas viejas cargados hoy).
+  @Prop({ default: Date.now })
+  date: Date;
+
   @Prop({ type: Types.ObjectId, ref: 'Transaction' })
   relatedTransactionId?: Types.ObjectId;
 

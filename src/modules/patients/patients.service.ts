@@ -1,10 +1,9 @@
 import {
   Injectable,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Types, Connection } from 'mongoose';
 import { Patient, PatientDocument } from './schemas/patient.schema';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -21,7 +20,29 @@ export class PatientsService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
     private readonly fichaScan: FichaScanService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
+
+  // Borrado físico del paciente + cascade de todo lo asociado (turnos, cuenta
+  // corriente, odontograma, evoluciones, plan). Se usa para limpiar duplicados
+  // cargados por error. Decisión de producto explícita (el resto es soft delete).
+  async hardDelete(clinicId: string, patientId: string) {
+    const cid = new Types.ObjectId(clinicId);
+    const pid = new Types.ObjectId(patientId);
+    const patient = await this.patientModel.findOne({ _id: pid, clinicId: cid }).exec();
+    if (!patient) throw new NotFoundException('Paciente no encontrado');
+
+    const filter = { clinicId: cid, patientId: pid };
+    const related = ['Appointment', 'Transaction', 'Odontogram', 'ClinicalEntry', 'TreatmentPlan'];
+    await Promise.all(
+      related.map((name) => {
+        const model = this.connection.models[name];
+        return model ? model.deleteMany(filter).exec() : Promise.resolve();
+      }),
+    );
+    await this.patientModel.deleteOne({ _id: pid, clinicId: cid }).exec();
+    return { ok: true };
+  }
 
   // Reads a paper record photo, returns the extracted fields plus a possible
   // existing patient match (by DNI → phone → name+lastName, scoped to the
@@ -83,13 +104,9 @@ export class PatientsService {
   }
 
   async create(clinicId: string, dto: CreatePatientDto, requester: JwtPayload) {
-    if (dto.dni) {
-      const existing = await this.patientModel
-        .findOne({ clinicId: new Types.ObjectId(clinicId), dni: dto.dni, deletedAt: null })
-        .exec();
-      if (existing) throw new ConflictException('Ya existe un paciente con ese DNI');
-    }
-
+    // Nota: NO bloqueamos por DNI repetido. El front avisa si ya existe, pero se
+    // permite cargar (puede ser el correcto) y se reconcilia después desde la
+    // lista de pacientes (banner de duplicados).
     return this.patientModel.create({
       ...dto,
       clinicId: new Types.ObjectId(clinicId),
@@ -129,18 +146,6 @@ export class PatientsService {
 
   async update(clinicId: string, patientId: string, dto: UpdatePatientDto, requester: JwtPayload) {
     const patient = await this.findById(clinicId, patientId);
-
-    if (dto.dni && dto.dni !== patient.dni) {
-      const conflict = await this.patientModel
-        .findOne({
-          clinicId: new Types.ObjectId(clinicId),
-          dni: dto.dni,
-          deletedAt: null,
-          _id: { $ne: new Types.ObjectId(patientId) },
-        })
-        .exec();
-      if (conflict) throw new ConflictException('Ya existe un paciente con ese DNI');
-    }
 
     Object.assign(patient, {
       ...dto,

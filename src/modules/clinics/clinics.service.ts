@@ -43,9 +43,14 @@ export class ClinicsService {
     if (dto.workingHours !== undefined) settings.workingHours = dto.workingHours;
     if (dto.whatsappTemplate !== undefined)
       settings.reminderTemplates = { whatsapp: dto.whatsappTemplate };
+    if (dto.quickAmounts !== undefined)
+      settings.quickAmounts = dto.quickAmounts.filter(n => n > 0).slice(0, 12);
+    if (dto.quickTreatments !== undefined)
+      settings.quickTreatments = dto.quickTreatments.map(t => t.trim()).filter(Boolean).slice(0, 24);
 
     clinic.settings = settings;
     clinic.updatedAt = new Date();
+    clinic.markModified('settings');
     return clinic.save();
   }
 }

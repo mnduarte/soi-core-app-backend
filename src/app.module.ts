@@ -14,6 +14,7 @@ import { TreatmentPlansModule } from './modules/treatment-plans/treatment-plans.
 import { ClinicalEntriesModule } from './modules/clinical-entries/clinical-entries.module';
 import { PriceCatalogModule } from './modules/price-catalog/price-catalog.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { DayNotesModule } from './modules/day-notes/day-notes.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { BannersModule } from './modules/banners/banners.module';
@@ -50,6 +51,7 @@ import { AdminModule } from './modules/admin/admin.module';
     ClinicalEntriesModule,
     PriceCatalogModule,
     AppointmentsModule,
+    DayNotesModule,
     GalleryModule,
     TransactionsModule,
     BannersModule,
