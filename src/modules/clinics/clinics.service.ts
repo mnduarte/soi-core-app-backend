@@ -47,6 +47,10 @@ export class ClinicsService {
       settings.quickAmounts = dto.quickAmounts.filter(n => n > 0).slice(0, 12);
     if (dto.quickTreatments !== undefined)
       settings.quickTreatments = dto.quickTreatments.map(t => t.trim()).filter(Boolean).slice(0, 24);
+    if (dto.slotTimes !== undefined)
+      settings.slotTimes = [...new Set(dto.slotTimes)].sort().slice(0, 60);
+    if (dto.photoCategories !== undefined)
+      settings.photoCategories = dto.photoCategories.map(c => c.trim()).filter(Boolean).slice(0, 20);
 
     clinic.settings = settings;
     clinic.updatedAt = new Date();

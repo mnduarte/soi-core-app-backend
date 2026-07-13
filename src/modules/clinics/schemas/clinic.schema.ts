@@ -46,6 +46,15 @@ export class ClinicSettings {
   @Prop({ type: [String], default: [] })
   quickTreatments: string[];
 
+  // Horarios/slots del día en la Libreta (ej. '08:00','08:30'…). Personalizables.
+  @Prop({ type: [String], default: [] })
+  slotTimes: string[];
+
+  // Categorías de fotos de la galería, personalizables por consultorio.
+  // Vacío → el front usa los defaults (Intraoral / Extraoral / Radiografía).
+  @Prop({ type: [String], default: [] })
+  photoCategories: string[];
+
   @Prop()
   logoUrl?: string;
 }

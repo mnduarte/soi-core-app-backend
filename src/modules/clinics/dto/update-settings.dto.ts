@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsArray,
   ValidateNested,
+  Matches,
   Min,
   Max,
 } from 'class-validator';
@@ -55,4 +56,14 @@ export class UpdateSettingsDto {
   @IsArray()
   @IsString({ each: true })
   quickTreatments?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @Matches(/^\d{2}:\d{2}$/, { each: true })
+  slotTimes?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  photoCategories?: string[];
 }

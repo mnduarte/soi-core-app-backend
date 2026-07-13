@@ -4,7 +4,7 @@ import { Model, Types } from 'mongoose';
 import {
   GallerySession,
   GallerySessionDocument,
-  PhotoType,
+  DEFAULT_PHOTO_CATEGORIES,
 } from './schemas/gallery-session.schema';
 import {
   CreateGallerySessionDto,
@@ -63,8 +63,10 @@ export class GalleryService {
       publicId: dto.publicId,
       url: dto.url,
       thumbnailUrl: dto.thumbnailUrl,
-      type: dto.type ?? PhotoType.INTRAORAL,
+      type: dto.type ?? DEFAULT_PHOTO_CATEGORIES[0],
       caption: dto.caption,
+      description: dto.description,
+      transactionId: dto.transactionId ? new Types.ObjectId(dto.transactionId) : undefined,
       toothNumber: dto.toothNumber,
       uploadedAt: new Date(),
       uploadedBy: new Types.ObjectId(requester.sub),
@@ -98,6 +100,9 @@ export class GalleryService {
     if (!photo) throw new NotFoundException('Foto no encontrada');
     if (dto.type !== undefined) photo.type = dto.type;
     if (dto.caption !== undefined) photo.caption = dto.caption;
+    if (dto.description !== undefined) photo.description = dto.description;
+    if (dto.transactionId !== undefined)
+      photo.transactionId = dto.transactionId ? new Types.ObjectId(dto.transactionId) : undefined;
     if (dto.toothNumber !== undefined) photo.toothNumber = dto.toothNumber;
     session.updatedBy = new Types.ObjectId(requester.sub);
     session.markModified('photos');

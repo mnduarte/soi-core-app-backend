@@ -123,13 +123,19 @@ export class PatientsService {
     };
 
     if (search?.trim()) {
-      filter.$text = { $search: search.trim() };
+      // Búsqueda parcial (substring) por cada palabra: cada término tiene que
+      // matchear al menos un campo. Así "luc" encuentra "Lucia" y "lucia fer"
+      // encuentra "Lucia Fernandes". ($text solo matchea palabras completas.)
+      const tokens = search.trim().split(/\s+/).map(escapeRegex);
+      filter.$and = tokens.map((tok) => {
+        const rx = new RegExp(tok, 'i');
+        return {
+          $or: [{ name: rx }, { lastName: rx }, { dni: rx }, { phone: rx }, { email: rx }],
+        };
+      });
     }
 
-    return this.patientModel
-      .find(filter)
-      .sort(search ? { score: { $meta: 'textScore' } } : { lastName: 1, name: 1 })
-      .exec();
+    return this.patientModel.find(filter).sort({ lastName: 1, name: 1 }).exec();
   }
 
   async findById(clinicId: string, patientId: string) {

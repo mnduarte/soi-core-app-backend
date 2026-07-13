@@ -1,5 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsEnum } from 'class-validator';
-import { PhotoType } from '../schemas/gallery-session.schema';
+import { IsString, IsOptional, IsNumber, IsMongoId } from 'class-validator';
 
 export class CreateGallerySessionDto {
   @IsString()
@@ -21,13 +20,23 @@ export class AddPhotoDto {
   @IsString()
   thumbnailUrl?: string;
 
+  // Categoría (string libre, personalizable por consultorio).
   @IsOptional()
-  @IsEnum(PhotoType)
-  type?: PhotoType;
+  @IsString()
+  type?: string;
 
   @IsOptional()
   @IsString()
   caption?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  // Vínculo opcional a un movimiento (cuenta corriente).
+  @IsOptional()
+  @IsMongoId()
+  transactionId?: string;
 
   @IsOptional()
   @IsNumber()
@@ -46,12 +55,21 @@ export class UpdateGallerySessionDto {
 
 export class UpdatePhotoDto {
   @IsOptional()
-  @IsEnum(PhotoType)
-  type?: PhotoType;
+  @IsString()
+  type?: string;
 
   @IsOptional()
   @IsString()
   caption?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  // Vínculo a un movimiento. String de ObjectId para vincular, '' para desvincular.
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
 
   @IsOptional()
   @IsNumber()
