@@ -11,7 +11,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { GalleryService } from './gallery.service';
 import {
@@ -42,12 +45,18 @@ export class GalleryController {
   }
 
   @Get('sessions')
-  findSessions(@ClinicId() clinicId: string, @Param('patientId') patientId: string) {
+  findSessions(
+    @ClinicId() clinicId: string,
+    @Param('patientId') patientId: string,
+  ) {
     return this.galleryService.findSessions(clinicId, patientId);
   }
 
   @Get('sessions/:sessionId')
-  findSession(@ClinicId() clinicId: string, @Param('sessionId') sessionId: string) {
+  findSession(
+    @ClinicId() clinicId: string,
+    @Param('sessionId') sessionId: string,
+  ) {
     return this.galleryService.findSession(clinicId, sessionId);
   }
 
@@ -79,7 +88,13 @@ export class GalleryController {
     @Body() dto: UpdatePhotoDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.galleryService.updatePhoto(clinicId, sessionId, photoId, dto, user);
+    return this.galleryService.updatePhoto(
+      clinicId,
+      sessionId,
+      photoId,
+      dto,
+      user,
+    );
   }
 
   @Delete('sessions/:sessionId/photos/:photoId')

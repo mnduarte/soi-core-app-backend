@@ -31,7 +31,11 @@ export class DayNotesService {
 
     return this.dayNoteModel
       .findOneAndUpdate(
-        { clinicId: new Types.ObjectId(clinicId), day: dto.day, deletedAt: null },
+        {
+          clinicId: new Types.ObjectId(clinicId),
+          day: dto.day,
+          deletedAt: null,
+        },
         {
           $set: {
             notes: dto.notes ?? '',

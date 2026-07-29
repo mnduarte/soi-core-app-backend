@@ -53,6 +53,12 @@ export class TreatmentItem {
   @Prop()
   estimatedDate?: Date;
 
+  // Fecha real en que se marcó el trabajo como hecho (COMPLETED). La setea el
+  // servicio al pasar a hecho y la limpia si vuelve a pendiente. Sirve para
+  // mostrar "hecho el DD/MM" y ordenar por realización.
+  @Prop()
+  completedAt?: Date;
+
   @Prop()
   notes?: string;
 }

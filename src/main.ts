@@ -16,7 +16,7 @@ function parseAllowedOrigins(): string[] {
   // the prod app from a local browser still works.
   const fromEnv = (process.env.FRONTEND_URLS ?? '')
     .split(',')
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
   return [...new Set([...DEV_ORIGINS, ...fromEnv])];
 }

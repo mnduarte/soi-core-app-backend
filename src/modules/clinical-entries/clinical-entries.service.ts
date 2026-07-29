@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { ClinicalEntry, ClinicalEntryDocument } from './schemas/clinical-entry.schema';
+import {
+  ClinicalEntry,
+  ClinicalEntryDocument,
+} from './schemas/clinical-entry.schema';
 import {
   Appointment,
   AppointmentDocument,
@@ -19,11 +22,18 @@ const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 @Injectable()
 export class ClinicalEntriesService {
   constructor(
-    @InjectModel(ClinicalEntry.name) private entryModel: Model<ClinicalEntryDocument>,
-    @InjectModel(Appointment.name) private appointmentModel: Model<AppointmentDocument>,
+    @InjectModel(ClinicalEntry.name)
+    private entryModel: Model<ClinicalEntryDocument>,
+    @InjectModel(Appointment.name)
+    private appointmentModel: Model<AppointmentDocument>,
   ) {}
 
-  async create(clinicId: string, patientId: string, dto: CreateClinicalEntryDto, requester: JwtPayload) {
+  async create(
+    clinicId: string,
+    patientId: string,
+    dto: CreateClinicalEntryDto,
+    requester: JwtPayload,
+  ) {
     // Si la entrada documenta un turno, validamos que el turno pertenezca a
     // esta clínica y a este paciente antes de enlazarlo (aislamiento tenant).
     let appointmentId: Types.ObjectId | undefined;
@@ -39,7 +49,7 @@ export class ClinicalEntriesService {
       if (!appointment) {
         throw new NotFoundException('Turno no encontrado para este paciente');
       }
-      appointmentId = appointment._id as Types.ObjectId;
+      appointmentId = appointment._id;
     }
 
     const entry = await this.entryModel.create({
@@ -47,8 +57,12 @@ export class ClinicalEntriesService {
       clinicId: new Types.ObjectId(clinicId),
       patientId: new Types.ObjectId(patientId),
       appointmentId,
-      professionalId: dto.professionalId ? new Types.ObjectId(dto.professionalId) : new Types.ObjectId(requester.sub),
-      correctedEntryId: dto.correctedEntryId ? new Types.ObjectId(dto.correctedEntryId) : undefined,
+      professionalId: dto.professionalId
+        ? new Types.ObjectId(dto.professionalId)
+        : new Types.ObjectId(requester.sub),
+      correctedEntryId: dto.correctedEntryId
+        ? new Types.ObjectId(dto.correctedEntryId)
+        : undefined,
       createdBy: new Types.ObjectId(requester.sub),
     });
 
@@ -93,12 +107,19 @@ export class ClinicalEntriesService {
     return entry;
   }
 
-  async update(clinicId: string, entryId: string, content: string, requester: JwtPayload) {
+  async update(
+    clinicId: string,
+    entryId: string,
+    content: string,
+    requester: JwtPayload,
+  ) {
     const entry = await this.findById(clinicId, entryId);
 
     const ageMs = Date.now() - entry.createdAt.getTime();
     if (ageMs > EDIT_WINDOW_MS) {
-      throw new ForbiddenException('Las entradas clínicas solo se pueden editar dentro de las 24 horas de su creación');
+      throw new ForbiddenException(
+        'Las entradas clínicas solo se pueden editar dentro de las 24 horas de su creación',
+      );
     }
 
     entry.editHistory.push({
@@ -119,7 +140,9 @@ export class ClinicalEntriesService {
 
     const ageMs = Date.now() - entry.createdAt.getTime();
     if (ageMs > EDIT_WINDOW_MS) {
-      throw new ForbiddenException('Las entradas clínicas solo se pueden eliminar dentro de las 24 horas de su creación');
+      throw new ForbiddenException(
+        'Las entradas clínicas solo se pueden eliminar dentro de las 24 horas de su creación',
+      );
     }
 
     entry.deletedAt = new Date();

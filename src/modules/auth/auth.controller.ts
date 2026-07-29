@@ -16,7 +16,10 @@ import { SetupPasswordDto } from './dto/setup-password.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
@@ -27,11 +30,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.authService.login(
-      dto,
-      req.ip,
-      req.headers['user-agent'],
-    );
+    return this.authService.login(dto, req.ip, req.headers['user-agent']);
   }
 
   @Post('lookup')
@@ -62,10 +61,7 @@ export class AuthController {
   @Post('refresh')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  refresh(
-    @Body('refreshToken') token: string,
-    @Req() req: Request,
-  ) {
+  refresh(@Body('refreshToken') token: string, @Req() req: Request) {
     return this.authService.refresh(token, req.ip, req.headers['user-agent']);
   }
 
@@ -86,6 +82,10 @@ export class AuthController {
   @Post('accept-invitation')
   @HttpCode(HttpStatus.CREATED)
   acceptInvitation(@Body() dto: AcceptInvitationDto, @Req() req: Request) {
-    return this.authService.acceptInvitation(dto, req.ip, req.headers['user-agent']);
+    return this.authService.acceptInvitation(
+      dto,
+      req.ip,
+      req.headers['user-agent'],
+    );
   }
 }

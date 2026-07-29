@@ -6,8 +6,16 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Appointment, AppointmentDocument, AppointmentStatus, FichaStatus } from './schemas/appointment.schema';
-import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/create-appointment.dto';
+import {
+  Appointment,
+  AppointmentDocument,
+  AppointmentStatus,
+  FichaStatus,
+} from './schemas/appointment.schema';
+import {
+  CreateAppointmentDto,
+  UpdateAppointmentDto,
+} from './dto/create-appointment.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { InjectModel as InjectClinicModel } from '@nestjs/mongoose';
 import { Clinic, ClinicDocument } from '../clinics/schemas/clinic.schema';
@@ -15,7 +23,8 @@ import { Clinic, ClinicDocument } from '../clinics/schemas/clinic.schema';
 @Injectable()
 export class AppointmentsService {
   constructor(
-    @InjectModel(Appointment.name) private appointmentModel: Model<AppointmentDocument>,
+    @InjectModel(Appointment.name)
+    private appointmentModel: Model<AppointmentDocument>,
     @InjectClinicModel(Clinic.name) private clinicModel: Model<ClinicDocument>,
   ) {}
 
@@ -53,21 +62,35 @@ export class AppointmentsService {
     }
   }
 
-  async create(clinicId: string, dto: CreateAppointmentDto, requester: JwtPayload) {
+  async create(
+    clinicId: string,
+    dto: CreateAppointmentDto,
+    requester: JwtPayload,
+  ) {
     if (!dto.patientId && !dto.patientName?.trim()) {
-      throw new BadRequestException('Falta el paciente o un nombre para el turno');
+      throw new BadRequestException(
+        'Falta el paciente o un nombre para el turno',
+      );
     }
 
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(dto.endsAt);
 
-    await this.checkOverlap(clinicId, startsAt, endsAt, undefined, dto.allowOverlap);
+    await this.checkOverlap(
+      clinicId,
+      startsAt,
+      endsAt,
+      undefined,
+      dto.allowOverlap,
+    );
 
     return this.appointmentModel.create({
       clinicId: new Types.ObjectId(clinicId),
       patientId: dto.patientId ? new Types.ObjectId(dto.patientId) : undefined,
       patientName: dto.patientName?.trim() || undefined,
-      professionalId: dto.professionalId ? new Types.ObjectId(dto.professionalId) : undefined,
+      professionalId: dto.professionalId
+        ? new Types.ObjectId(dto.professionalId)
+        : undefined,
       startsAt,
       endsAt,
       title: dto.title,
@@ -76,7 +99,12 @@ export class AppointmentsService {
     });
   }
 
-  async findAll(clinicId: string, from?: string, to?: string, patientId?: string) {
+  async findAll(
+    clinicId: string,
+    from?: string,
+    to?: string,
+    patientId?: string,
+  ) {
     const filter: Record<string, unknown> = {
       clinicId: new Types.ObjectId(clinicId),
       deletedAt: null,
@@ -106,10 +134,17 @@ export class AppointmentsService {
     return appointment;
   }
 
-  async update(clinicId: string, appointmentId: string, dto: UpdateAppointmentDto, requester: JwtPayload) {
+  async update(
+    clinicId: string,
+    appointmentId: string,
+    dto: UpdateAppointmentDto,
+    requester: JwtPayload,
+  ) {
     const appointment = await this.findById(clinicId, appointmentId);
 
-    const startsAt = dto.startsAt ? new Date(dto.startsAt) : appointment.startsAt;
+    const startsAt = dto.startsAt
+      ? new Date(dto.startsAt)
+      : appointment.startsAt;
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : appointment.endsAt;
 
     if (dto.startsAt || dto.endsAt) {
@@ -120,8 +155,12 @@ export class AppointmentsService {
       ...dto,
       startsAt,
       endsAt,
-      patientId: dto.patientId ? new Types.ObjectId(dto.patientId) : appointment.patientId,
-      professionalId: dto.professionalId ? new Types.ObjectId(dto.professionalId) : appointment.professionalId,
+      patientId: dto.patientId
+        ? new Types.ObjectId(dto.patientId)
+        : appointment.patientId,
+      professionalId: dto.professionalId
+        ? new Types.ObjectId(dto.professionalId)
+        : appointment.professionalId,
     });
 
     // Ficha lifecycle is coupled to status transitions:
@@ -153,7 +192,11 @@ export class AppointmentsService {
     return appointment.save();
   }
 
-  async softDelete(clinicId: string, appointmentId: string, requester: JwtPayload) {
+  async softDelete(
+    clinicId: string,
+    appointmentId: string,
+    requester: JwtPayload,
+  ) {
     const appointment = await this.findById(clinicId, appointmentId);
     appointment.deletedAt = new Date();
     appointment.deletedBy = new Types.ObjectId(requester.sub);
@@ -170,7 +213,8 @@ export class AppointmentsService {
         clinicId: new Types.ObjectId(clinicId),
       })
       .exec();
-    if (res.deletedCount === 0) throw new NotFoundException('Turno no encontrado');
+    if (res.deletedCount === 0)
+      throw new NotFoundException('Turno no encontrado');
     return { ok: true };
   }
 }

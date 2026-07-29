@@ -68,4 +68,9 @@ export const AppointmentSchema = SchemaFactory.createForClass(Appointment);
 
 AppointmentSchema.index({ clinicId: 1, startsAt: 1, deletedAt: 1 });
 AppointmentSchema.index({ clinicId: 1, patientId: 1, deletedAt: 1 });
-AppointmentSchema.index({ clinicId: 1, professionalId: 1, startsAt: 1, deletedAt: 1 });
+AppointmentSchema.index({
+  clinicId: 1,
+  professionalId: 1,
+  startsAt: 1,
+  deletedAt: 1,
+});

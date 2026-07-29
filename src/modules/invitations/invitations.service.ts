@@ -20,7 +20,11 @@ export class InvitationsService {
     private config: ConfigService,
   ) {}
 
-  async create(clinicId: string, dto: CreateInvitationDto, requester: JwtPayload) {
+  async create(
+    clinicId: string,
+    dto: CreateInvitationDto,
+    requester: JwtPayload,
+  ) {
     // Check for pending invitation for same email
     const existing = await this.invitationModel
       .findOne({
@@ -33,7 +37,9 @@ export class InvitationsService {
       .exec();
 
     if (existing) {
-      throw new ConflictException('Ya existe una invitación pendiente para ese email');
+      throw new ConflictException(
+        'Ya existe una invitación pendiente para ese email',
+      );
     }
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -50,7 +56,10 @@ export class InvitationsService {
       createdBy: new Types.ObjectId(requester.sub),
     });
 
-    const frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:5173');
+    const frontendUrl = this.config.get(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
     return {
       ...invitation.toObject(),
       inviteLink: `${frontendUrl}/accept-invitation?token=${token}`,

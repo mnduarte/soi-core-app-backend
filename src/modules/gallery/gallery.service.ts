@@ -19,11 +19,17 @@ import * as crypto from 'crypto';
 @Injectable()
 export class GalleryService {
   constructor(
-    @InjectModel(GallerySession.name) private sessionModel: Model<GallerySessionDocument>,
+    @InjectModel(GallerySession.name)
+    private sessionModel: Model<GallerySessionDocument>,
     private config: ConfigService,
   ) {}
 
-  async createSession(clinicId: string, patientId: string, dto: CreateGallerySessionDto, requester: JwtPayload) {
+  async createSession(
+    clinicId: string,
+    patientId: string,
+    dto: CreateGallerySessionDto,
+    requester: JwtPayload,
+  ) {
     return this.sessionModel.create({
       clinicId: new Types.ObjectId(clinicId),
       patientId: new Types.ObjectId(patientId),
@@ -52,11 +58,17 @@ export class GalleryService {
         deletedAt: null,
       })
       .exec();
-    if (!session) throw new NotFoundException('Sesión de galería no encontrada');
+    if (!session)
+      throw new NotFoundException('Sesión de galería no encontrada');
     return session;
   }
 
-  async addPhoto(clinicId: string, sessionId: string, dto: AddPhotoDto, requester: JwtPayload) {
+  async addPhoto(
+    clinicId: string,
+    sessionId: string,
+    dto: AddPhotoDto,
+    requester: JwtPayload,
+  ) {
     const session = await this.findSession(clinicId, sessionId);
     session.photos.push({
       _id: new Types.ObjectId(),
@@ -66,7 +78,12 @@ export class GalleryService {
       type: dto.type ?? DEFAULT_PHOTO_CATEGORIES[0],
       caption: dto.caption,
       description: dto.description,
-      transactionId: dto.transactionId ? new Types.ObjectId(dto.transactionId) : undefined,
+      transactionId: dto.transactionId
+        ? new Types.ObjectId(dto.transactionId)
+        : undefined,
+      treatmentItemId: dto.treatmentItemId
+        ? new Types.ObjectId(dto.treatmentItemId)
+        : undefined,
       toothNumber: dto.toothNumber,
       uploadedAt: new Date(),
       uploadedBy: new Types.ObjectId(requester.sub),
@@ -96,22 +113,35 @@ export class GalleryService {
     requester: JwtPayload,
   ) {
     const session = await this.findSession(clinicId, sessionId);
-    const photo = session.photos.find(p => p._id.toString() === photoId);
+    const photo = session.photos.find((p) => p._id.toString() === photoId);
     if (!photo) throw new NotFoundException('Foto no encontrada');
     if (dto.type !== undefined) photo.type = dto.type;
     if (dto.caption !== undefined) photo.caption = dto.caption;
     if (dto.description !== undefined) photo.description = dto.description;
     if (dto.transactionId !== undefined)
-      photo.transactionId = dto.transactionId ? new Types.ObjectId(dto.transactionId) : undefined;
+      photo.transactionId = dto.transactionId
+        ? new Types.ObjectId(dto.transactionId)
+        : undefined;
+    if (dto.treatmentItemId !== undefined)
+      photo.treatmentItemId = dto.treatmentItemId
+        ? new Types.ObjectId(dto.treatmentItemId)
+        : undefined;
     if (dto.toothNumber !== undefined) photo.toothNumber = dto.toothNumber;
     session.updatedBy = new Types.ObjectId(requester.sub);
     session.markModified('photos');
     return session.save();
   }
 
-  async removePhoto(clinicId: string, sessionId: string, photoId: string, requester: JwtPayload) {
+  async removePhoto(
+    clinicId: string,
+    sessionId: string,
+    photoId: string,
+    requester: JwtPayload,
+  ) {
     const session = await this.findSession(clinicId, sessionId);
-    const photoIndex = session.photos.findIndex(p => p._id.toString() === photoId);
+    const photoIndex = session.photos.findIndex(
+      (p) => p._id.toString() === photoId,
+    );
     if (photoIndex < 0) throw new NotFoundException('Foto no encontrada');
     session.photos.splice(photoIndex, 1);
     session.updatedBy = new Types.ObjectId(requester.sub);
@@ -132,7 +162,11 @@ export class GalleryService {
     return { cloudName, apiKey, timestamp, folder, signature };
   }
 
-  async softDeleteSession(clinicId: string, sessionId: string, requester: JwtPayload) {
+  async softDeleteSession(
+    clinicId: string,
+    sessionId: string,
+    requester: JwtPayload,
+  ) {
     const session = await this.findSession(clinicId, sessionId);
     session.deletedAt = new Date();
     session.deletedBy = new Types.ObjectId(requester.sub);

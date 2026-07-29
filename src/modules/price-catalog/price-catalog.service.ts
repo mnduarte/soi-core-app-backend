@@ -1,17 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { PriceCatalogItem, PriceCatalogItemDocument } from './schemas/price-catalog-item.schema';
+import {
+  PriceCatalogItem,
+  PriceCatalogItemDocument,
+} from './schemas/price-catalog-item.schema';
 import { CreatePriceCatalogItemDto } from './dto/create-price-catalog-item.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
 export class PriceCatalogService {
   constructor(
-    @InjectModel(PriceCatalogItem.name) private itemModel: Model<PriceCatalogItemDocument>,
+    @InjectModel(PriceCatalogItem.name)
+    private itemModel: Model<PriceCatalogItemDocument>,
   ) {}
 
-  async create(clinicId: string, dto: CreatePriceCatalogItemDto, requester: JwtPayload) {
+  async create(
+    clinicId: string,
+    dto: CreatePriceCatalogItemDto,
+    requester: JwtPayload,
+  ) {
     return this.itemModel.create({
       ...dto,
       clinicId: new Types.ObjectId(clinicId),
@@ -41,7 +49,12 @@ export class PriceCatalogService {
     return item;
   }
 
-  async update(clinicId: string, itemId: string, dto: Partial<CreatePriceCatalogItemDto>, requester: JwtPayload) {
+  async update(
+    clinicId: string,
+    itemId: string,
+    dto: Partial<CreatePriceCatalogItemDto>,
+    requester: JwtPayload,
+  ) {
     const item = await this.findById(clinicId, itemId);
     Object.assign(item, dto);
     item.updatedAt = new Date();

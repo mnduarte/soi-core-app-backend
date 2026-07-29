@@ -11,7 +11,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { ClinicalEntriesService } from './clinical-entries.service';
 import { CreateClinicalEntryDto } from './dto/create-clinical-entry.dto';
@@ -25,7 +28,9 @@ class UpdateContentDto {
 @Controller('patients/:patientId/clinical-entries')
 @UseGuards(JwtAuthGuard)
 export class ClinicalEntriesController {
-  constructor(private readonly clinicalEntriesService: ClinicalEntriesService) {}
+  constructor(
+    private readonly clinicalEntriesService: ClinicalEntriesService,
+  ) {}
 
   @Post()
   create(

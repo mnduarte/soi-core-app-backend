@@ -13,7 +13,12 @@ import {
   ClinicDocument,
   SubscriptionStatus,
 } from '../clinics/schemas/clinic.schema';
-import { User, UserDocument, UserRole, UserTitle } from '../users/schemas/user.schema';
+import {
+  User,
+  UserDocument,
+  UserRole,
+  UserTitle,
+} from '../users/schemas/user.schema';
 import { Banner, BannerDocument } from '../banners/schemas/banner.schema';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import {
@@ -95,8 +100,10 @@ export class AdminService {
 
   async updateSettings(dto: UpdateAdminSettingsDto) {
     const settings = await this.getSettings();
-    if (dto.gracePeriodDays != null) settings.gracePeriodDays = dto.gracePeriodDays;
-    if (dto.planPriceMonthly != null) settings.planPriceMonthly = dto.planPriceMonthly;
+    if (dto.gracePeriodDays != null)
+      settings.gracePeriodDays = dto.gracePeriodDays;
+    if (dto.planPriceMonthly != null)
+      settings.planPriceMonthly = dto.planPriceMonthly;
     return (settings as AdminSettingsDocument).save();
   }
 
@@ -141,7 +148,7 @@ export class AdminService {
   // ---------------------------------------------------------------------------
 
   private async enrichClinic(clinic: ClinicDocument, gracePeriodDays: number) {
-    const clinicId = clinic._id as Types.ObjectId;
+    const clinicId = clinic._id;
     const [patientsCount, lastUser, owner] = await Promise.all([
       this.patientModel.countDocuments({ clinicId, deletedAt: null }),
       this.userModel
@@ -155,7 +162,11 @@ export class AdminService {
         .exec(),
     ]);
     const daysToDue = this.computeDaysToDue(clinic);
-    const paymentStatus = this.derivePaymentStatus(clinic, daysToDue, gracePeriodDays);
+    const paymentStatus = this.derivePaymentStatus(
+      clinic,
+      daysToDue,
+      gracePeriodDays,
+    );
     // The OWNER has activated the account if they've taken setupPassword off
     // the pending list. New seeded accounts (no flag) are treated as activated
     // so the badge doesn't regress on existing data.
@@ -197,7 +208,7 @@ export class AdminService {
       this.clinicModel.countDocuments({ deletedAt: null }),
     ]);
     const enriched = await Promise.all(
-      clinics.map(c => this.enrichClinic(c, settings.gracePeriodDays)),
+      clinics.map((c) => this.enrichClinic(c, settings.gracePeriodDays)),
     );
     return { clinics: enriched, total, page, limit };
   }
@@ -215,11 +226,15 @@ export class AdminService {
   // Username/slug availability (used by the backoffice form in live validation)
   // ---------------------------------------------------------------------------
 
-  async checkSlugAvailability(slug: string): Promise<{ available: boolean; slug: string }> {
+  async checkSlugAvailability(
+    slug: string,
+  ): Promise<{ available: boolean; slug: string }> {
     const normalized = slugify(slug);
     if (!normalized) return { available: false, slug: normalized };
-    const taken = await this.clinicModel
-      .exists({ slug: normalized, deletedAt: null });
+    const taken = await this.clinicModel.exists({
+      slug: normalized,
+      deletedAt: null,
+    });
     return { available: !taken, slug: normalized };
   }
 
@@ -231,9 +246,9 @@ export class AdminService {
     const slug = slugify(dto.slug || dto.name);
     if (!slug) throw new BadRequestException('Slug inválido');
 
-    const slugTaken = await this.clinicModel
-      .exists({ slug, deletedAt: null });
-    if (slugTaken) throw new BadRequestException('Ese usuario / slug ya existe');
+    const slugTaken = await this.clinicModel.exists({ slug, deletedAt: null });
+    if (slugTaken)
+      throw new BadRequestException('Ese usuario / slug ya existe');
 
     const tempPassword = dto.password ?? generateTempPassword();
     const passwordHash = await argon2.hash(tempPassword);
@@ -303,7 +318,8 @@ export class AdminService {
       'logoStyle',
     ] as const;
     for (const f of fields) {
-      if (dto[f] !== undefined) (clinic as unknown as Record<string, unknown>)[f] = dto[f];
+      if (dto[f] !== undefined)
+        (clinic as unknown as Record<string, unknown>)[f] = dto[f];
     }
     clinic.updatedAt = new Date();
     await clinic.save();
@@ -327,13 +343,17 @@ export class AdminService {
   // Subscription actions (extend, payment, suspend, reactivate)
   // ---------------------------------------------------------------------------
 
-  async updateClinicSubscription(clinicId: string, dto: UpdateClinicSubscriptionDto) {
+  async updateClinicSubscription(
+    clinicId: string,
+    dto: UpdateClinicSubscriptionDto,
+  ) {
     const clinic = await this.clinicModel
       .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
       .exec();
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
     if (dto.status) clinic.status = dto.status as unknown as SubscriptionStatus;
-    if (dto.subscriptionEndsAt) clinic.subscriptionEndsAt = new Date(dto.subscriptionEndsAt);
+    if (dto.subscriptionEndsAt)
+      clinic.subscriptionEndsAt = new Date(dto.subscriptionEndsAt);
     await clinic.save();
     const settings = await this.getSettings();
     return this.enrichClinic(clinic, settings.gracePeriodDays);
@@ -345,7 +365,9 @@ export class AdminService {
       .exec();
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
     const base = clinic.subscriptionEndsAt ?? new Date();
-    clinic.subscriptionEndsAt = new Date(base.getTime() + dto.days * MS_PER_DAY);
+    clinic.subscriptionEndsAt = new Date(
+      base.getTime() + dto.days * MS_PER_DAY,
+    );
     if (clinic.status === SubscriptionStatus.SUSPENDED) {
       clinic.status = SubscriptionStatus.ACTIVE;
     }
@@ -437,8 +459,8 @@ export class AdminService {
       .find({ clinicId: new Types.ObjectId(clinicId), deletedAt: null })
       .sort({ role: 1, createdAt: 1 })
       .exec();
-    return users.map(u => ({
-      _id: (u._id as Types.ObjectId).toString(),
+    return users.map((u) => ({
+      _id: u._id.toString(),
       name: u.name,
       username: u.username ?? null,
       title: u.title ?? UserTitle.NONE,
@@ -480,7 +502,7 @@ export class AdminService {
 
     return {
       user: {
-        _id: (user._id as Types.ObjectId).toString(),
+        _id: user._id.toString(),
         name: user.name,
         username,
         role: user.role,
@@ -526,7 +548,9 @@ export class AdminService {
       .exec();
     if (!user) throw new NotFoundException('Usuario no encontrado');
     if (user.role === UserRole.OWNER) {
-      throw new BadRequestException('No se puede eliminar al titular (OWNER) de la clínica');
+      throw new BadRequestException(
+        'No se puede eliminar al titular (OWNER) de la clínica',
+      );
     }
     user.deletedAt = new Date();
     await user.save();
@@ -548,9 +572,9 @@ export class AdminService {
     if (!owner) throw new NotFoundException('OWNER user no encontrado');
 
     const payload = {
-      sub: (owner._id as Types.ObjectId).toString(),
+      sub: owner._id.toString(),
       email: owner.email,
-      clinicId: (owner.clinicId as Types.ObjectId).toString(),
+      clinicId: owner.clinicId.toString(),
       role: owner.role,
       isClinical: owner.isClinical,
       imp: true,
@@ -577,16 +601,22 @@ export class AdminService {
 
     if (requests.length === 0) return [];
 
-    const clinicIds = [...new Set(requests.map(r => r.clinicId.toString()))];
-    const userIds = [...new Set(requests.map(r => r.userId.toString()))];
+    const clinicIds = [...new Set(requests.map((r) => r.clinicId.toString()))];
+    const userIds = [...new Set(requests.map((r) => r.userId.toString()))];
     const [clinics, users] = await Promise.all([
-      this.clinicModel.find({ _id: { $in: clinicIds } }).lean().exec(),
-      this.userModel.find({ _id: { $in: userIds } }).lean().exec(),
+      this.clinicModel
+        .find({ _id: { $in: clinicIds } })
+        .lean()
+        .exec(),
+      this.userModel
+        .find({ _id: { $in: userIds } })
+        .lean()
+        .exec(),
     ]);
-    const clinicMap = new Map(clinics.map(c => [c._id.toString(), c]));
-    const userMap = new Map(users.map(u => [u._id.toString(), u]));
+    const clinicMap = new Map(clinics.map((c) => [c._id.toString(), c]));
+    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
-    return requests.map(r => {
+    return requests.map((r) => {
       const clinic = clinicMap.get(r.clinicId.toString());
       const user = userMap.get(r.userId.toString());
       return {
@@ -603,7 +633,9 @@ export class AdminService {
               doctorName: clinic.doctorName ?? null,
             }
           : null,
-        user: user ? { name: user.name, username: user.username ?? null } : null,
+        user: user
+          ? { name: user.name, username: user.username ?? null }
+          : null,
       };
     });
   }
@@ -611,14 +643,17 @@ export class AdminService {
   async resolvePasswordResetRequest(id: string) {
     const req = await this.resetRequestModel.findById(id).exec();
     if (!req) throw new NotFoundException('Pedido no encontrado');
-    if (req.resolvedAt) return { _id: req._id.toString(), resolvedAt: req.resolvedAt };
+    if (req.resolvedAt)
+      return { _id: req._id.toString(), resolvedAt: req.resolvedAt };
     req.resolvedAt = new Date();
     await req.save();
     return { _id: req._id.toString(), resolvedAt: req.resolvedAt };
   }
 
   async countPendingPasswordResetRequests() {
-    const count = await this.resetRequestModel.countDocuments({ resolvedAt: null }).exec();
+    const count = await this.resetRequestModel
+      .countDocuments({ resolvedAt: null })
+      .exec();
     return { count };
   }
 
@@ -638,11 +673,23 @@ export class AdminService {
       pendingOwners,
     ] = await Promise.all([
       this.clinicModel.countDocuments({ deletedAt: null }),
-      this.clinicModel.countDocuments({ deletedAt: null, status: SubscriptionStatus.ACTIVE }),
-      this.clinicModel.countDocuments({ deletedAt: null, status: SubscriptionStatus.TRIAL }),
-      this.clinicModel.countDocuments({ deletedAt: null, status: SubscriptionStatus.SUSPENDED }),
+      this.clinicModel.countDocuments({
+        deletedAt: null,
+        status: SubscriptionStatus.ACTIVE,
+      }),
+      this.clinicModel.countDocuments({
+        deletedAt: null,
+        status: SubscriptionStatus.TRIAL,
+      }),
+      this.clinicModel.countDocuments({
+        deletedAt: null,
+        status: SubscriptionStatus.SUSPENDED,
+      }),
       this.userModel.countDocuments({ deletedAt: null }),
-      this.clinicModel.find({ deletedAt: null }).select('subscriptionEndsAt status createdAt').exec(),
+      this.clinicModel
+        .find({ deletedAt: null })
+        .select('subscriptionEndsAt status createdAt')
+        .exec(),
       this.userModel.countDocuments({
         deletedAt: null,
         role: UserRole.OWNER,

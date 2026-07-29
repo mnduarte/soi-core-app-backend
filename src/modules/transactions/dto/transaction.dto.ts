@@ -1,4 +1,12 @@
-import { IsNumber, IsOptional, IsString, IsEnum, IsMongoId, Min, IsDateString } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsMongoId,
+  Min,
+  IsDateString,
+} from 'class-validator';
 import { PaymentMethod, TransactionType } from '../schemas/transaction.schema';
 
 export class CreateTransactionDto {

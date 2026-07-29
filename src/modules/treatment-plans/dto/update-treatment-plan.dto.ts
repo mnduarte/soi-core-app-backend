@@ -1,9 +1,17 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsOptional, IsEnum, IsString, IsDateString, IsNumber } from 'class-validator';
+import {
+  IsOptional,
+  IsEnum,
+  IsString,
+  IsDateString,
+  IsNumber,
+} from 'class-validator';
 import { CreateTreatmentPlanDto } from './create-treatment-plan.dto';
 import { TreatmentItemStatus } from '../schemas/treatment-plan.schema';
 
-export class UpdateTreatmentPlanDto extends PartialType(CreateTreatmentPlanDto) {}
+export class UpdateTreatmentPlanDto extends PartialType(
+  CreateTreatmentPlanDto,
+) {}
 
 export class UpdateTreatmentItemDto {
   @IsOptional()
@@ -21,6 +29,11 @@ export class UpdateTreatmentItemDto {
   @IsOptional()
   @IsEnum(TreatmentItemStatus)
   status?: TreatmentItemStatus;
+
+  // El precio del trabajo se puede editar (el Dr. ajusta montos sobre la marcha).
+  @IsOptional()
+  @IsNumber()
+  price?: number;
 
   @IsOptional()
   @IsDateString()

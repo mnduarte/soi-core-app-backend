@@ -8,7 +8,10 @@ import { Clinic, ClinicSchema } from '../clinics/schemas/clinic.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Banner, BannerSchema } from '../banners/schemas/banner.schema';
 import { Patient, PatientSchema } from '../patients/schemas/patient.schema';
-import { AdminSettings, AdminSettingsSchema } from './schemas/admin-settings.schema';
+import {
+  AdminSettings,
+  AdminSettingsSchema,
+} from './schemas/admin-settings.schema';
 import {
   PasswordResetRequest,
   PasswordResetRequestSchema,

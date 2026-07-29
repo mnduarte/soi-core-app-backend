@@ -1,13 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
 import { Patient, PatientDocument } from './schemas/patient.schema';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { ScanFichaDto } from './dto/scan-ficha.dto';
+import { QuickCreatePatientDto } from './dto/quick-create-patient.dto';
 import { FichaScanService } from './ficha-scan.service';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
@@ -29,11 +27,19 @@ export class PatientsService {
   async hardDelete(clinicId: string, patientId: string) {
     const cid = new Types.ObjectId(clinicId);
     const pid = new Types.ObjectId(patientId);
-    const patient = await this.patientModel.findOne({ _id: pid, clinicId: cid }).exec();
+    const patient = await this.patientModel
+      .findOne({ _id: pid, clinicId: cid })
+      .exec();
     if (!patient) throw new NotFoundException('Paciente no encontrado');
 
     const filter = { clinicId: cid, patientId: pid };
-    const related = ['Appointment', 'Transaction', 'Odontogram', 'ClinicalEntry', 'TreatmentPlan'];
+    const related = [
+      'Appointment',
+      'Transaction',
+      'Odontogram',
+      'ClinicalEntry',
+      'TreatmentPlan',
+    ];
     await Promise.all(
       related.map((name) => {
         const model = this.connection.models[name];
@@ -67,9 +73,15 @@ export class PatientsService {
       return null;
     };
 
-    let match: { _id: Types.ObjectId; name: string; lastName: string; deleted: boolean } | null = null;
+    let match: {
+      _id: Types.ObjectId;
+      name: string;
+      lastName: string;
+      deleted: boolean;
+    } | null = null;
     if (extracted.dni) match = await findMatch({ dni: extracted.dni });
-    if (!match && extracted.phone) match = await findMatch({ phone: extracted.phone });
+    if (!match && extracted.phone)
+      match = await findMatch({ phone: extracted.phone });
     if (!match && extracted.name && extracted.lastName) {
       match = await findMatch({
         name: new RegExp(`^${escapeRegex(extracted.name)}$`, 'i'),
@@ -94,11 +106,17 @@ export class PatientsService {
   // the deletedAt:null filter on purpose.
   async restore(clinicId: string, patientId: string) {
     const patient = await this.patientModel
-      .findOne({ _id: new Types.ObjectId(patientId), clinicId: new Types.ObjectId(clinicId) })
+      .findOne({
+        _id: new Types.ObjectId(patientId),
+        clinicId: new Types.ObjectId(clinicId),
+      })
       .exec();
     if (!patient) throw new NotFoundException('Paciente no encontrado');
     await this.patientModel
-      .updateOne({ _id: patient._id }, { $unset: { deletedAt: '', deletedBy: '' } })
+      .updateOne(
+        { _id: patient._id },
+        { $unset: { deletedAt: '', deletedBy: '' } },
+      )
       .exec();
     return { ok: true };
   }
@@ -112,6 +130,24 @@ export class PatientsService {
       clinicId: new Types.ObjectId(clinicId),
       birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
       isActive: dto.isActive ?? true,
+      createdBy: new Types.ObjectId(requester.sub),
+    });
+  }
+
+  // Crear paciente rápido desde la agenda: solo nombre, se splitea automáticamente.
+  async quickCreate(
+    clinicId: string,
+    dto: QuickCreatePatientDto,
+    requester: JwtPayload,
+  ) {
+    const parts = dto.fullName.trim().split(/\s+/);
+    const name = parts[0];
+    const lastName = parts.slice(1).join(' ') || '—'; // Guión si no hay apellido
+    return this.patientModel.create({
+      name,
+      lastName,
+      clinicId: new Types.ObjectId(clinicId),
+      isActive: true,
       createdBy: new Types.ObjectId(requester.sub),
     });
   }
@@ -130,7 +166,13 @@ export class PatientsService {
       filter.$and = tokens.map((tok) => {
         const rx = new RegExp(tok, 'i');
         return {
-          $or: [{ name: rx }, { lastName: rx }, { dni: rx }, { phone: rx }, { email: rx }],
+          $or: [
+            { name: rx },
+            { lastName: rx },
+            { dni: rx },
+            { phone: rx },
+            { email: rx },
+          ],
         };
       });
     }
@@ -150,7 +192,12 @@ export class PatientsService {
     return patient;
   }
 
-  async update(clinicId: string, patientId: string, dto: UpdatePatientDto, requester: JwtPayload) {
+  async update(
+    clinicId: string,
+    patientId: string,
+    dto: UpdatePatientDto,
+    requester: JwtPayload,
+  ) {
     const patient = await this.findById(clinicId, patientId);
 
     Object.assign(patient, {

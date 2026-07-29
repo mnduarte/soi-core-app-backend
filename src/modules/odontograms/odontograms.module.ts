@@ -6,7 +6,9 @@ import { Odontogram, OdontogramSchema } from './schemas/odontogram.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Odontogram.name, schema: OdontogramSchema }]),
+    MongooseModule.forFeature([
+      { name: Odontogram.name, schema: OdontogramSchema },
+    ]),
   ],
   controllers: [OdontogramsController],
   providers: [OdontogramsService],

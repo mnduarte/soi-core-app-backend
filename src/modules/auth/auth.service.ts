@@ -13,9 +13,19 @@ import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
-import { Clinic, ClinicDocument, SubscriptionStatus } from '../clinics/schemas/clinic.schema';
-import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
-import { Invitation, InvitationDocument } from '../invitations/schemas/invitation.schema';
+import {
+  Clinic,
+  ClinicDocument,
+  SubscriptionStatus,
+} from '../clinics/schemas/clinic.schema';
+import {
+  RefreshToken,
+  RefreshTokenDocument,
+} from './schemas/refresh-token.schema';
+import {
+  Invitation,
+  InvitationDocument,
+} from '../invitations/schemas/invitation.schema';
 import { LoginDto } from './dto/login.dto';
 import { LookupDto } from './dto/lookup.dto';
 import { SetupPasswordDto } from './dto/setup-password.dto';
@@ -108,7 +118,11 @@ export class AuthService {
   // First-login: verify the temp password, set the chosen one, clear the
   // flag, and issue tokens just like a normal login. Same response shape
   // as login() so the client can drop the user straight into the app.
-  async setupPassword(dto: SetupPasswordDto, ipAddress?: string, userAgent?: string) {
+  async setupPassword(
+    dto: SetupPasswordDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const raw = dto.identifier.trim().toLowerCase();
     const user = await this.userModel
       .findOne({
@@ -128,7 +142,9 @@ export class AuthService {
     const clinic = await this.clinicModel.findById(user.clinicId).exec();
     if (!clinic) throw new UnauthorizedException('Consultorio no encontrado');
     if (clinic.status === SubscriptionStatus.SUSPENDED) {
-      throw new ForbiddenException('La cuenta está suspendida. Contactá al administrador.');
+      throw new ForbiddenException(
+        'La cuenta está suspendida. Contactá al administrador.',
+      );
     }
 
     if (isFullyBlocked(clinic)) {
@@ -174,7 +190,10 @@ export class AuthService {
         requestedAt: new Date(),
       });
 
-      const clinic = await this.clinicModel.findById(user.clinicId).select('name').exec();
+      const clinic = await this.clinicModel
+        .findById(user.clinicId)
+        .select('name')
+        .exec();
       const lines = [
         '🔑 <b>Pedido de reset de contraseña</b>',
         `Usuario: <code>${raw}</code> (${user.name})`,
@@ -255,7 +274,7 @@ export class AuthService {
 
     if (live.length <= MAX_ACTIVE_SESSIONS) return;
 
-    const excessIds = live.slice(MAX_ACTIVE_SESSIONS).map(t => t._id);
+    const excessIds = live.slice(MAX_ACTIVE_SESSIONS).map((t) => t._id);
     await this.refreshTokenModel
       .updateMany(
         { _id: { $in: excessIds } },
@@ -297,7 +316,8 @@ export class AuthService {
             // explain it.
             throw new UnauthorizedException({
               code: 'SESSION_REPLACED',
-              message: 'Tu sesión se cerró porque entraste desde otro dispositivo.',
+              message:
+                'Tu sesión se cerró porque entraste desde otro dispositivo.',
             });
           }
           // Genuine reuse of an already-rotated token — assume the token
@@ -306,7 +326,9 @@ export class AuthService {
             { userId: candidate.userId, revokedAt: null },
             { revokedAt: new Date(), revokeReason: 'LOGOUT' },
           );
-          throw new UnauthorizedException('Token reutilizado. Sesión revocada.');
+          throw new UnauthorizedException(
+            'Token reutilizado. Sesión revocada.',
+          );
         }
       }
 
@@ -326,14 +348,21 @@ export class AuthService {
     if (!clinic) throw new UnauthorizedException();
 
     if (clinic.status === SubscriptionStatus.SUSPENDED) {
-      throw new ForbiddenException('La cuenta está suspendida. Contactá al administrador.');
+      throw new ForbiddenException(
+        'La cuenta está suspendida. Contactá al administrador.',
+      );
     }
 
     if (isFullyBlocked(clinic)) {
       throw new ForbiddenException('La suscripción venció.');
     }
 
-    const result = await this.buildAuthResponse(user, clinic, ipAddress, userAgent);
+    const result = await this.buildAuthResponse(
+      user,
+      clinic,
+      ipAddress,
+      userAgent,
+    );
 
     // Link the new token as replacement
     const newToken = await this.refreshTokenModel
@@ -342,7 +371,7 @@ export class AuthService {
       .exec();
 
     if (newToken) {
-      matched.replacedByTokenId = newToken._id as Types.ObjectId;
+      matched.replacedByTokenId = newToken._id;
       await matched.save();
     }
 
@@ -368,12 +397,14 @@ export class AuthService {
   // Lightweight poll target. The core-app calls this every ~30s so suspension
   // and session eviction take effect quickly without per-request cost or
   // WebSockets. Returns ok:false + a reason the client maps to a message.
-  async sessionStatus(
-    user: JwtPayload,
-  ): Promise<{ ok: boolean; reason?: 'SUSPENDED' | 'EXPIRED' | 'SESSION_REPLACED' | 'BLOCKED' }> {
+  async sessionStatus(user: JwtPayload): Promise<{
+    ok: boolean;
+    reason?: 'SUSPENDED' | 'EXPIRED' | 'SESSION_REPLACED' | 'BLOCKED';
+  }> {
     const clinic = await this.clinicModel.findById(user.clinicId).exec();
     if (!clinic || clinic.deletedAt) return { ok: false, reason: 'BLOCKED' };
-    if (clinic.status === SubscriptionStatus.SUSPENDED) return { ok: false, reason: 'SUSPENDED' };
+    if (clinic.status === SubscriptionStatus.SUSPENDED)
+      return { ok: false, reason: 'SUSPENDED' };
     if (isFullyBlocked(clinic)) return { ok: false, reason: 'EXPIRED' };
 
     // Session eviction (device cap / logout). Only checkable when the token
@@ -383,13 +414,18 @@ export class AuthService {
         .findById(user.sid)
         .select('revokedAt')
         .exec();
-      if (!session || session.revokedAt) return { ok: false, reason: 'SESSION_REPLACED' };
+      if (!session || session.revokedAt)
+        return { ok: false, reason: 'SESSION_REPLACED' };
     }
 
     return { ok: true };
   }
 
-  async acceptInvitation(dto: AcceptInvitationDto, ipAddress?: string, userAgent?: string) {
+  async acceptInvitation(
+    dto: AcceptInvitationDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const invitation = await this.invitationModel
       .findOne({
         token: dto.token,
@@ -404,7 +440,11 @@ export class AuthService {
     }
 
     const existing = await this.userModel
-      .findOne({ clinicId: invitation.clinicId, email: invitation.email, deletedAt: null })
+      .findOne({
+        clinicId: invitation.clinicId,
+        email: invitation.email,
+        deletedAt: null,
+      })
       .exec();
     if (existing) throw new ConflictException('El email ya tiene una cuenta');
 
@@ -464,22 +504,22 @@ export class AuthService {
     });
 
     const accessToken = this.jwtService.sign({
-      sub: (user._id as Types.ObjectId).toString(),
+      sub: user._id.toString(),
       email: user.email,
-      clinicId: (user.clinicId as Types.ObjectId).toString(),
+      clinicId: user.clinicId.toString(),
       role: user.role,
       isClinical: user.isClinical,
-      sid: (refreshDoc._id as Types.ObjectId).toString(),
+      sid: refreshDoc._id.toString(),
     });
 
     // Keep at most MAX_ACTIVE_SESSIONS devices logged in — evict the oldest.
-    await this.enforceDeviceLimit(user._id as Types.ObjectId);
+    await this.enforceDeviceLimit(user._id);
 
     return {
       accessToken,
       refreshToken: rawRefreshToken,
       user: {
-        id: (user._id as Types.ObjectId).toString(),
+        id: user._id.toString(),
         email: user.email,
         name: user.name,
         title: user.title ?? null,
@@ -488,7 +528,7 @@ export class AuthService {
         clinicalProfile: user.clinicalProfile,
       },
       clinic: {
-        id: (clinic._id as Types.ObjectId).toString(),
+        id: clinic._id.toString(),
         name: clinic.name,
         status: clinic.status,
         brandColor: clinic.brandColor,

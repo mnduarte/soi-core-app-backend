@@ -4,7 +4,10 @@ import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
 import * as argon2 from 'argon2';
 import { User, UserRole } from './modules/users/schemas/user.schema';
-import { Clinic, SubscriptionStatus } from './modules/clinics/schemas/clinic.schema';
+import {
+  Clinic,
+  SubscriptionStatus,
+} from './modules/clinics/schemas/clinic.schema';
 import { AdminUser } from './modules/admin-auth/schemas/admin-user.schema';
 
 const MS_PER_DAY = 86_400_000;
@@ -146,7 +149,8 @@ async function seed() {
         brandColor: seed.brandColor,
         logoStyle: 'tooth',
         status: seed.status,
-        subscriptionEndsAt: seed.daysToDue == null ? undefined : daysFromNow(seed.daysToDue),
+        subscriptionEndsAt:
+          seed.daysToDue == null ? undefined : daysFromNow(seed.daysToDue),
         settings: {
           timezone: 'America/Argentina/Buenos_Aires',
           appointmentDurationDefault: 30,
@@ -178,7 +182,9 @@ async function seed() {
 
   // Admin user. Credentials are env-overridable so production can be seeded
   // with a strong password instead of the dev default.
-  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? 'admin@soi.com').toLowerCase();
+  const adminEmail = (
+    process.env.SEED_ADMIN_EMAIL ?? 'admin@soi.com'
+  ).toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'admin123';
   let admin = await adminModel.findOne({ email: adminEmail }).exec();
   if (!admin) {
@@ -196,16 +202,20 @@ async function seed() {
   }
 
   console.log('\n📋 Credenciales:');
-  console.log(`  Backoffice:  ${adminEmail}   /  ${process.env.SEED_ADMIN_PASSWORD ? '<tu clave>' : 'admin123'}`);
+  console.log(
+    `  Backoffice:  ${adminEmail}   /  ${process.env.SEED_ADMIN_PASSWORD ? '<tu clave>' : 'admin123'}`,
+  );
   if (!adminOnly) {
     console.log(`  Consultorio: <slug>          /  ${sharedPassword}`);
-    console.log(`               (slugs: ${SEED_CLINICS.map(c => c.slug).join(', ')})`);
+    console.log(
+      `               (slugs: ${SEED_CLINICS.map((c) => c.slug).join(', ')})`,
+    );
   }
 
   await app.close();
 }
 
-seed().catch(err => {
+seed().catch((err) => {
   console.error(err);
   process.exit(1);
 });

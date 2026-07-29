@@ -24,7 +24,11 @@ export class ToothCondition {
   @Prop({ required: true })
   condition: string;
 
-  @Prop({ type: String, enum: ToothConditionStatus, default: ToothConditionStatus.REQUIRED })
+  @Prop({
+    type: String,
+    enum: ToothConditionStatus,
+    default: ToothConditionStatus.REQUIRED,
+  })
   status: ToothConditionStatus;
 
   @Prop()
@@ -82,7 +86,4 @@ export class Odontogram {
 
 export const OdontogramSchema = SchemaFactory.createForClass(Odontogram);
 
-OdontogramSchema.index(
-  { clinicId: 1, patientId: 1 },
-  { unique: true },
-);
+OdontogramSchema.index({ clinicId: 1, patientId: 1 }, { unique: true });

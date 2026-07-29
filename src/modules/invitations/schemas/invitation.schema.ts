@@ -41,6 +41,9 @@ export const InvitationSchema = SchemaFactory.createForClass(Invitation);
 
 InvitationSchema.index(
   { token: 1 },
-  { unique: true, partialFilterExpression: { acceptedAt: null, revokedAt: null } },
+  {
+    unique: true,
+    partialFilterExpression: { acceptedAt: null, revokedAt: null },
+  },
 );
 InvitationSchema.index({ clinicId: 1, email: 1 });

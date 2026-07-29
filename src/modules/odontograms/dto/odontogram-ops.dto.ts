@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, IsIn, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsIn,
+  IsEnum,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ToothConditionStatus } from '../schemas/odontogram.schema';
 

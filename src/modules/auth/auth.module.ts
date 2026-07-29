@@ -8,8 +8,14 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Clinic, ClinicSchema } from '../clinics/schemas/clinic.schema';
-import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
-import { Invitation, InvitationSchema } from '../invitations/schemas/invitation.schema';
+import {
+  RefreshToken,
+  RefreshTokenSchema,
+} from './schemas/refresh-token.schema';
+import {
+  Invitation,
+  InvitationSchema,
+} from '../invitations/schemas/invitation.schema';
 import { AdminModule } from '../admin/admin.module';
 
 @Module({
@@ -19,7 +25,9 @@ import { AdminModule } from '../admin/admin.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_USER_SECRET'),
-        signOptions: { expiresIn: config.get<string>('JWT_USER_EXPIRES_IN', '15m') as any },
+        signOptions: {
+          expiresIn: config.get<string>('JWT_USER_EXPIRES_IN', '15m') as any,
+        },
       }),
       inject: [ConfigService],
     }),

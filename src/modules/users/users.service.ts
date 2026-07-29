@@ -11,9 +11,7 @@ import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    @InjectModel(User.name) private userModel: Model<UserDocument>,
-  ) {}
+  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
   async findAll(clinicId: string, isClinical?: boolean) {
     const filter: Record<string, unknown> = {
@@ -37,7 +35,12 @@ export class UsersService {
     return user;
   }
 
-  async update(clinicId: string, userId: string, dto: UpdateUserDto, requester: JwtPayload) {
+  async update(
+    clinicId: string,
+    userId: string,
+    dto: UpdateUserDto,
+    requester: JwtPayload,
+  ) {
     const user = await this.findById(clinicId, userId);
 
     // Only OWNER can change roles

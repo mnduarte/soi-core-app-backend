@@ -47,10 +47,7 @@ export class AdminController {
   }
 
   @Get('clinics')
-  findAllClinics(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  findAllClinics(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.adminService.findAllClinics(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
@@ -78,12 +75,18 @@ export class AdminController {
   }
 
   @Patch('clinics/:id/subscription')
-  updateSubscription(@Param('id') id: string, @Body() dto: UpdateClinicSubscriptionDto) {
+  updateSubscription(
+    @Param('id') id: string,
+    @Body() dto: UpdateClinicSubscriptionDto,
+  ) {
     return this.adminService.updateClinicSubscription(id, dto);
   }
 
   @Post('clinics/:id/extend-subscription')
-  extendSubscription(@Param('id') id: string, @Body() dto: ExtendSubscriptionDto) {
+  extendSubscription(
+    @Param('id') id: string,
+    @Body() dto: ExtendSubscriptionDto,
+  ) {
     return this.adminService.extendSubscription(id, dto);
   }
 
@@ -125,7 +128,10 @@ export class AdminController {
   }
 
   @Delete('clinics/:id/users/:userId')
-  deactivateClinicUser(@Param('id') id: string, @Param('userId') userId: string) {
+  deactivateClinicUser(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
     return this.adminService.deactivateClinicUser(id, userId);
   }
 

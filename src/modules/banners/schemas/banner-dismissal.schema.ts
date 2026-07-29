@@ -15,6 +15,7 @@ export class BannerDismissal {
   dismissedAt: Date;
 }
 
-export const BannerDismissalSchema = SchemaFactory.createForClass(BannerDismissal);
+export const BannerDismissalSchema =
+  SchemaFactory.createForClass(BannerDismissal);
 
 BannerDismissalSchema.index({ bannerId: 1, userId: 1 }, { unique: true });

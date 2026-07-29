@@ -17,22 +17,26 @@ export class TelegramService {
 
     if (!token || !chatId) {
       this.logger.warn(
-        '[TELEGRAM] no configurado — saltando notificación: ' + text.split('\n')[0],
+        '[TELEGRAM] no configurado — saltando notificación: ' +
+          text.split('\n')[0],
       );
       return;
     }
 
     try {
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
-      });
+      const res = await fetch(
+        `https://api.telegram.org/bot${token}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+          }),
+        },
+      );
       if (!res.ok) {
         const body = await res.text();
         this.logger.error(`[TELEGRAM] fallo (${res.status}): ${body}`);

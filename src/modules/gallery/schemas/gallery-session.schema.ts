@@ -7,7 +7,11 @@ export type GallerySessionDocument = HydratedDocument<GallerySession>;
 // Categoría de la foto. Es un string libre porque cada consultorio la
 // personaliza (ClinicSettings.photoCategories); los defaults del front son
 // Intraoral / Extraoral / Radiografía.
-export const DEFAULT_PHOTO_CATEGORIES = ['Intraoral', 'Extraoral', 'Radiografía'];
+export const DEFAULT_PHOTO_CATEGORIES = [
+  'Intraoral',
+  'Extraoral',
+  'Radiografía',
+];
 
 export class GalleryPhoto {
   @Prop({ type: Types.ObjectId, auto: true })
@@ -35,6 +39,12 @@ export class GalleryPhoto {
   // desde una fila/movimiento de la ficha. Opcional.
   @Prop({ type: Types.ObjectId, ref: 'Transaction' })
   transactionId?: Types.ObjectId;
+
+  // Trabajo (item del plan de tratamiento) al que se vincula la foto. Es el
+  // vínculo clínico preferido: una foto documenta un trabajo, no un pago. El
+  // item vive embebido en el plan, así que guardamos su _id sin ref. Opcional.
+  @Prop({ type: Types.ObjectId })
+  treatmentItemId?: Types.ObjectId;
 
   @Prop()
   toothNumber?: number;
@@ -64,6 +74,7 @@ export class GallerySession extends BaseEntity {
   photos: GalleryPhoto[];
 }
 
-export const GallerySessionSchema = SchemaFactory.createForClass(GallerySession);
+export const GallerySessionSchema =
+  SchemaFactory.createForClass(GallerySession);
 
 GallerySessionSchema.index({ clinicId: 1, patientId: 1, deletedAt: 1 });

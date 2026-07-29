@@ -11,6 +11,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { OdontogramsModule } from './modules/odontograms/odontograms.module';
 import { TreatmentPlansModule } from './modules/treatment-plans/treatment-plans.module';
+import { WorksModule } from './modules/works/works.module';
 import { ClinicalEntriesModule } from './modules/clinical-entries/clinical-entries.module';
 import { PriceCatalogModule } from './modules/price-catalog/price-catalog.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
@@ -48,6 +49,7 @@ import { AdminModule } from './modules/admin/admin.module';
     PatientsModule,
     OdontogramsModule,
     TreatmentPlansModule,
+    WorksModule,
     ClinicalEntriesModule,
     PriceCatalogModule,
     AppointmentsModule,

@@ -12,7 +12,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { PriceCatalogService } from './price-catalog.service';
 import { CreatePriceCatalogItemDto } from './dto/create-price-catalog-item.dto';

@@ -39,7 +39,11 @@ export class ClinicalEntry extends BaseEntity {
   @Prop({ type: Types.ObjectId, ref: 'Appointment' })
   appointmentId?: Types.ObjectId;
 
-  @Prop({ type: String, enum: ClinicalEntryType, default: ClinicalEntryType.NOTE })
+  @Prop({
+    type: String,
+    enum: ClinicalEntryType,
+    default: ClinicalEntryType.NOTE,
+  })
   type: ClinicalEntryType;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })

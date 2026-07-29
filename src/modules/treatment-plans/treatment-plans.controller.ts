@@ -11,7 +11,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { TreatmentPlansService } from './treatment-plans.service';
 import { CreateTreatmentPlanDto } from './dto/create-treatment-plan.dto';
@@ -64,7 +67,13 @@ export class TreatmentPlansController {
     @Body() dto: UpdateTreatmentItemDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.treatmentPlansService.updateItem(clinicId, id, itemId, dto, user);
+    return this.treatmentPlansService.updateItem(
+      clinicId,
+      id,
+      itemId,
+      dto,
+      user,
+    );
   }
 
   // Append-style endpoint: the controller is mounted under

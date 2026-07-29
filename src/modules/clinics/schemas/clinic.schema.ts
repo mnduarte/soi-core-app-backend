@@ -105,4 +105,7 @@ export class Clinic extends BaseEntity {
 
 export const ClinicSchema = SchemaFactory.createForClass(Clinic);
 
-ClinicSchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
+ClinicSchema.index(
+  { slug: 1 },
+  { unique: true, partialFilterExpression: { deletedAt: null } },
+);

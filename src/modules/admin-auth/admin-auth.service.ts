@@ -9,7 +9,8 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 @Injectable()
 export class AdminAuthService {
   constructor(
-    @InjectModel(AdminUser.name) private adminUserModel: Model<AdminUserDocument>,
+    @InjectModel(AdminUser.name)
+    private adminUserModel: Model<AdminUserDocument>,
     private jwtService: JwtService,
   ) {}
 
@@ -23,9 +24,16 @@ export class AdminAuthService {
     const valid = await argon2.verify(admin.passwordHash, dto.password);
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
 
-    const payload = { sub: admin._id.toString(), email: admin.email, role: 'SUPERADMIN' };
+    const payload = {
+      sub: admin._id.toString(),
+      email: admin.email,
+      role: 'SUPERADMIN',
+    };
     const accessToken = this.jwtService.sign(payload);
 
-    return { accessToken, admin: { id: admin._id, email: admin.email, role: admin.role } };
+    return {
+      accessToken,
+      admin: { id: admin._id, email: admin.email, role: admin.role },
+    };
   }
 }

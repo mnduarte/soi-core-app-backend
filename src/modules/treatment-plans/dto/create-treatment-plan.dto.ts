@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsArray, ValidateNested, IsNumber, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { TreatmentItemStatus } from '../schemas/treatment-plan.schema';
 

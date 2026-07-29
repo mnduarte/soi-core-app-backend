@@ -12,17 +12,32 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { ScanFichaDto } from './dto/scan-ficha.dto';
+import { QuickCreatePatientDto } from './dto/quick-create-patient.dto';
 
 @Controller('patients')
 @UseGuards(JwtAuthGuard)
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
+
+  // Crear paciente rápido desde agenda (solo nombre, se splitea automáticamente).
+  @Post('quick-create')
+  @HttpCode(HttpStatus.CREATED)
+  quickCreate(
+    @ClinicId() clinicId: string,
+    @Body() dto: QuickCreatePatientDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.patientsService.quickCreate(clinicId, dto, user);
+  }
 
   // Read a paper record photo → extracted fields + possible existing match.
   @Post('scan')
@@ -40,10 +55,7 @@ export class PatientsController {
   }
 
   @Get()
-  findAll(
-    @ClinicId() clinicId: string,
-    @Query('search') search?: string,
-  ) {
+  findAll(@ClinicId() clinicId: string, @Query('search') search?: string) {
     return this.patientsService.findAll(clinicId, search);
   }
 

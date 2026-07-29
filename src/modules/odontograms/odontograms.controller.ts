@@ -8,7 +8,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { OdontogramsService } from './odontograms.service';
 import { ApplyOpsDto } from './dto/odontogram-ops.dto';
@@ -34,7 +37,10 @@ export class OdontogramsController {
   }
 
   @Get('snapshots')
-  getSnapshots(@ClinicId() clinicId: string, @Param('patientId') patientId: string) {
+  getSnapshots(
+    @ClinicId() clinicId: string,
+    @Param('patientId') patientId: string,
+  ) {
     return this.odontogramsService.getSnapshots(clinicId, patientId);
   }
 

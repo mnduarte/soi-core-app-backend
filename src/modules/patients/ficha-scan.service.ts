@@ -53,7 +53,10 @@ export class FichaScanService {
 
   constructor(private readonly config: ConfigService) {}
 
-  async extract(imageBase64: string, mediaType: string): Promise<ExtractedPatient> {
+  async extract(
+    imageBase64: string,
+    mediaType: string,
+  ): Promise<ExtractedPatient> {
     const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
     if (!apiKey) {
       throw new InternalServerErrorException(
@@ -67,7 +70,8 @@ export class FichaScanService {
     const client = new Anthropic({ apiKey });
     // Cheapest capable vision model by default; bump to claude-sonnet-4-6 (or
     // claude-opus-4-8) via env if handwriting accuracy isn't enough.
-    const model = this.config.get<string>('ANTHROPIC_VISION_MODEL') ?? 'claude-haiku-4-5';
+    const model =
+      this.config.get<string>('ANTHROPIC_VISION_MODEL') ?? 'claude-haiku-4-5';
 
     let raw: string;
     try {
@@ -82,7 +86,11 @@ export class FichaScanService {
                 type: 'image',
                 source: {
                   type: 'base64',
-                  media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
+                  media_type: mediaType as
+                    | 'image/jpeg'
+                    | 'image/png'
+                    | 'image/webp'
+                    | 'image/gif',
                   data: imageBase64,
                 },
               },

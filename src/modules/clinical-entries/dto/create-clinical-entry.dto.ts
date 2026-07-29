@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsMongoId, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsMongoId,
+  IsEnum,
+} from 'class-validator';
 import { ClinicalEntryType } from '../schemas/clinical-entry.schema';
 
 export class CreateClinicalEntryDto {

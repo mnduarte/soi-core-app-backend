@@ -10,13 +10,17 @@ import { JwtAdminStrategy } from './strategies/jwt-admin.strategy';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: AdminUser.name, schema: AdminUserSchema }]),
+    MongooseModule.forFeature([
+      { name: AdminUser.name, schema: AdminUserSchema },
+    ]),
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_ADMIN_SECRET', 'admin_secret'),
-        signOptions: { expiresIn: config.get<string>('JWT_ADMIN_EXPIRES_IN', '24h') as any },
+        signOptions: {
+          expiresIn: config.get<string>('JWT_ADMIN_EXPIRES_IN', '24h') as any,
+        },
       }),
     }),
   ],

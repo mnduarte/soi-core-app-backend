@@ -25,7 +25,8 @@ export class PriceCatalogItem extends BaseEntity {
   isActive: boolean;
 }
 
-export const PriceCatalogItemSchema = SchemaFactory.createForClass(PriceCatalogItem);
+export const PriceCatalogItemSchema =
+  SchemaFactory.createForClass(PriceCatalogItem);
 
 PriceCatalogItemSchema.index({ clinicId: 1, deletedAt: 1 });
 PriceCatalogItemSchema.index({ clinicId: 1, category: 1, deletedAt: 1 });

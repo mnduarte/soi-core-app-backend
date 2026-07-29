@@ -12,10 +12,16 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { TransactionsService } from './transactions.service';
-import { CreateTransactionDto, UpdateTransactionDto } from './dto/transaction.dto';
+import {
+  CreateTransactionDto,
+  UpdateTransactionDto,
+} from './dto/transaction.dto';
 
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
@@ -32,12 +38,31 @@ export class TransactionsController {
   }
 
   @Get()
-  findAll(@ClinicId() clinicId: string, @Query('patientId') patientId?: string) {
-    return this.transactionsService.findAll(clinicId, patientId);
+  findAll(
+    @ClinicId() clinicId: string,
+    @Query('patientId') patientId?: string,
+    // Filtros server-side del modal de Pagos: rango de fechas (from/to, YYYY-MM-DD),
+    // texto libre (q → método/descr/monto) y tipo (PAYMENT).
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.transactionsService.findAll(clinicId, patientId, {
+      from,
+      to,
+      q,
+      type,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('balance/:patientId')
-  getBalance(@ClinicId() clinicId: string, @Param('patientId') patientId: string) {
+  getBalance(
+    @ClinicId() clinicId: string,
+    @Param('patientId') patientId: string,
+  ) {
     return this.transactionsService.getBalance(clinicId, patientId);
   }
 

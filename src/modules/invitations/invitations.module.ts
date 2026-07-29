@@ -6,7 +6,9 @@ import { Invitation, InvitationSchema } from './schemas/invitation.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Invitation.name, schema: InvitationSchema }]),
+    MongooseModule.forFeature([
+      { name: Invitation.name, schema: InvitationSchema },
+    ]),
   ],
   controllers: [InvitationsController],
   providers: [InvitationsService],

@@ -1,7 +1,10 @@
 import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { DayNotesService } from './day-notes.service';
 import { SaveDayNoteDto } from './dto/save-day-note.dto';
 

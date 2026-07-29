@@ -7,11 +7,6 @@ import {
   TreatmentPlan,
   TreatmentPlanDocument,
 } from './schemas/treatment-plan.schema';
-import {
-  Transaction,
-  TransactionDocument,
-  TransactionType,
-} from '../transactions/schemas/transaction.schema';
 import { CreateTreatmentPlanDto } from './dto/create-treatment-plan.dto';
 import {
   AddTreatmentItemDto,
@@ -23,14 +18,19 @@ import { JwtPayload } from '../../common/decorators/current-user.decorator';
 @Injectable()
 export class TreatmentPlansService {
   constructor(
-    @InjectModel(TreatmentPlan.name) private planModel: Model<TreatmentPlanDocument>,
-    @InjectModel(Transaction.name) private transactionModel: Model<TransactionDocument>,
+    @InjectModel(TreatmentPlan.name)
+    private planModel: Model<TreatmentPlanDocument>,
   ) {}
 
-  async create(clinicId: string, patientId: string, dto: CreateTreatmentPlanDto, requester: JwtPayload) {
+  async create(
+    clinicId: string,
+    patientId: string,
+    dto: CreateTreatmentPlanDto,
+    requester: JwtPayload,
+  ) {
     // Items arrive with ISO-string dates; the schema stores Date. Coerce before
     // handing it to Mongoose so the cast doesn't silently produce undefined.
-    const items = (dto.items ?? []).map(it => ({
+    const items = (dto.items ?? []).map((it) => ({
       ...it,
       estimatedDate: it.estimatedDate ? new Date(it.estimatedDate) : undefined,
     }));
@@ -67,7 +67,12 @@ export class TreatmentPlansService {
     return plan;
   }
 
-  async update(clinicId: string, planId: string, dto: UpdateTreatmentPlanDto, requester: JwtPayload) {
+  async update(
+    clinicId: string,
+    planId: string,
+    dto: UpdateTreatmentPlanDto,
+    requester: JwtPayload,
+  ) {
     const plan = await this.findById(clinicId, planId);
     Object.assign(plan, dto);
     plan.updatedAt = new Date();
@@ -75,37 +80,43 @@ export class TreatmentPlansService {
     return plan.save();
   }
 
-  async updateItem(clinicId: string, planId: string, itemId: string, dto: UpdateTreatmentItemDto, requester: JwtPayload) {
+  async updateItem(
+    clinicId: string,
+    planId: string,
+    itemId: string,
+    dto: UpdateTreatmentItemDto,
+    requester: JwtPayload,
+  ) {
     const plan = await this.findById(clinicId, planId);
-    const item = plan.items.find(i => i._id.toString() === itemId);
+    const item = plan.items.find((i) => i._id.toString() === itemId);
     if (!item) throw new NotFoundException('Item no encontrado');
 
-    const wasCompleted = item.status === TreatmentItemStatus.COMPLETED;
+    // Modelo "Falta cobrar": completar un trabajo NO genera un cargo. La deuda
+    // se calcula en vivo como (Σ precio de trabajos hechos − Σ pagos); marcar
+    // "hecho" es progreso clínico y no toca la plata por sí solo.
+    //
+    // OJO: NO usar `Object.assign(item, { ...dto })`. Con `transform: true`, el
+    // DTO de class-validator es una instancia con TODAS las opcionales presentes
+    // como `undefined` (exposeUnsetFields). Un spread pisaría description/price
+    // con undefined → se guardan como null (bug de "(sin nombre)" al tildar).
+    // Por eso asignamos SOLO los campos realmente enviados.
+    const wasComplete = item.status === TreatmentItemStatus.COMPLETED;
+    if (dto.description !== undefined) item.description = dto.description;
+    if (dto.toothNumber !== undefined) item.toothNumber = dto.toothNumber;
+    if (dto.surface !== undefined) item.surface = dto.surface;
+    if (dto.status !== undefined) item.status = dto.status;
+    if (dto.price !== undefined) item.price = dto.price;
+    if (dto.notes !== undefined) item.notes = dto.notes;
+    if (dto.estimatedDate !== undefined)
+      item.estimatedDate = new Date(dto.estimatedDate);
 
-    Object.assign(item, {
-      ...dto,
-      estimatedDate: dto.estimatedDate ? new Date(dto.estimatedDate) : item.estimatedDate,
-    });
-
-    // Al completar un ítem (transición real, con precio y sin cargo previo) se
-    // genera el cargo en la cuenta corriente. Idempotente vía chargeTransactionId.
-    if (
-      item.status === TreatmentItemStatus.COMPLETED &&
-      !wasCompleted &&
-      !item.chargeTransactionId &&
-      item.price > 0
-    ) {
-      const charge = await this.transactionModel.create({
-        clinicId: new Types.ObjectId(clinicId),
-        patientId: plan.patientId,
-        type: TransactionType.CHARGE,
-        amount: item.price,
-        description: item.toothNumber
-          ? `${item.description} · diente ${item.toothNumber}`
-          : item.description,
-        createdBy: new Types.ObjectId(requester.sub),
-      });
-      item.chargeTransactionId = charge._id as Types.ObjectId;
+    // Sellamos/limpiamos la fecha de realización según la transición de estado:
+    // al pasar a hecho la guardamos (una sola vez), al volver a pendiente la
+    // borramos. La fecha la maneja el servidor, no el cliente.
+    if (dto.status !== undefined) {
+      const isComplete = dto.status === TreatmentItemStatus.COMPLETED;
+      if (isComplete && !wasComplete) item.completedAt = new Date();
+      else if (!isComplete && wasComplete) item.completedAt = undefined;
     }
 
     plan.updatedAt = new Date();
@@ -118,7 +129,12 @@ export class TreatmentPlansService {
   // has no plan yet, this auto-creates one called "Plan general"; otherwise it
   // appends to the most recent plan. The frontend treats a patient as having
   // a single ongoing plan, so this matches that mental model.
-  async addItem(clinicId: string, patientId: string, dto: AddTreatmentItemDto, requester: JwtPayload) {
+  async addItem(
+    clinicId: string,
+    patientId: string,
+    dto: AddTreatmentItemDto,
+    requester: JwtPayload,
+  ) {
     const plans = await this.findAll(clinicId, patientId);
     let plan: TreatmentPlanDocument;
     if (plans.length === 0) {
@@ -139,7 +155,12 @@ export class TreatmentPlansService {
       toothNumber: dto.toothNumber,
       surface: dto.surface,
       status: dto.status ?? TreatmentItemStatus.PROPOSED,
-      estimatedDate: dto.estimatedDate ? new Date(dto.estimatedDate) : undefined,
+      estimatedDate: dto.estimatedDate
+        ? new Date(dto.estimatedDate)
+        : undefined,
+      // Si se agrega ya marcado como hecho, sellamos la fecha de realización.
+      completedAt:
+        dto.status === TreatmentItemStatus.COMPLETED ? new Date() : undefined,
       price: dto.price ?? 0,
       notes: dto.notes,
     };
@@ -150,11 +171,17 @@ export class TreatmentPlansService {
     return plan.save();
   }
 
-  async removeItem(clinicId: string, planId: string, itemId: string, requester: JwtPayload) {
+  async removeItem(
+    clinicId: string,
+    planId: string,
+    itemId: string,
+    requester: JwtPayload,
+  ) {
     const plan = await this.findById(clinicId, planId);
     const before = plan.items.length;
-    plan.items = plan.items.filter(i => i._id.toString() !== itemId);
-    if (plan.items.length === before) throw new NotFoundException('Item no encontrado');
+    plan.items = plan.items.filter((i) => i._id.toString() !== itemId);
+    if (plan.items.length === before)
+      throw new NotFoundException('Item no encontrado');
     plan.updatedAt = new Date();
     plan.updatedBy = new Types.ObjectId(requester.sub);
     plan.markModified('items');

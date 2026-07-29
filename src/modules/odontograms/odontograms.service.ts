@@ -14,10 +14,14 @@ import { JwtPayload } from '../../common/decorators/current-user.decorator';
 @Injectable()
 export class OdontogramsService {
   constructor(
-    @InjectModel(Odontogram.name) private odontogramModel: Model<OdontogramDocument>,
+    @InjectModel(Odontogram.name)
+    private odontogramModel: Model<OdontogramDocument>,
   ) {}
 
-  async findOrCreate(clinicId: string, patientId: string): Promise<OdontogramDocument> {
+  async findOrCreate(
+    clinicId: string,
+    patientId: string,
+  ): Promise<OdontogramDocument> {
     const existing = await this.odontogramModel
       .findOne({
         clinicId: new Types.ObjectId(clinicId),
@@ -35,7 +39,12 @@ export class OdontogramsService {
     });
   }
 
-  async applyOps(clinicId: string, patientId: string, dto: ApplyOpsDto, requester: JwtPayload) {
+  async applyOps(
+    clinicId: string,
+    patientId: string,
+    dto: ApplyOpsDto,
+    requester: JwtPayload,
+  ) {
     const odontogram = await this.findOrCreate(clinicId, patientId);
 
     const teeth: ToothState[] = JSON.parse(JSON.stringify(odontogram.teeth));
@@ -60,7 +69,7 @@ export class OdontogramsService {
   }
 
   private applyOp(teeth: ToothState[], op: OdontogramOpDto): void {
-    let tooth = teeth.find(t => t.toothNumber === op.toothNumber);
+    let tooth = teeth.find((t) => t.toothNumber === op.toothNumber);
 
     if (!tooth) {
       tooth = { toothNumber: op.toothNumber, conditions: [] };
@@ -78,7 +87,9 @@ export class OdontogramsService {
             status: op.condition.status ?? ToothConditionStatus.REQUIRED,
             notes: op.condition.notes,
           };
-          const idx = tooth.conditions.findIndex(c => c.surface === normalized.surface);
+          const idx = tooth.conditions.findIndex(
+            (c) => c.surface === normalized.surface,
+          );
           if (idx >= 0) {
             tooth.conditions[idx] = normalized;
           } else {
@@ -89,7 +100,9 @@ export class OdontogramsService {
 
       case 'remove_condition':
         if (op.surface) {
-          tooth.conditions = tooth.conditions.filter(c => c.surface !== op.surface);
+          tooth.conditions = tooth.conditions.filter(
+            (c) => c.surface !== op.surface,
+          );
         }
         break;
 
@@ -116,7 +129,11 @@ export class OdontogramsService {
     return odontogram.snapshots;
   }
 
-  async saveSnapshot(clinicId: string, patientId: string, requester: JwtPayload) {
+  async saveSnapshot(
+    clinicId: string,
+    patientId: string,
+    requester: JwtPayload,
+  ) {
     const odontogram = await this.odontogramModel
       .findOne({
         clinicId: new Types.ObjectId(clinicId),

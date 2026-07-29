@@ -28,7 +28,11 @@ export class Transaction extends BaseEntity {
   @Prop({ required: true, type: Types.ObjectId, ref: 'Patient' })
   patientId: Types.ObjectId;
 
-  @Prop({ required: true, default: TransactionType.PAYMENT, enum: TransactionType })
+  @Prop({
+    required: true,
+    default: TransactionType.PAYMENT,
+    enum: TransactionType,
+  })
   type: TransactionType;
 
   @Prop({ required: true })

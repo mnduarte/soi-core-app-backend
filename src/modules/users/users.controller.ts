@@ -13,7 +13,10 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser, type JwtPayload } from '../../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type JwtPayload,
+} from '../../common/decorators/current-user.decorator';
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -37,10 +40,7 @@ export class UsersController {
   // impersonation to render the doctor's name in the banner without having to
   // decode the JWT for anything other than ids.
   @Get('me')
-  getMe(
-    @ClinicId() clinicId: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  getMe(@ClinicId() clinicId: string, @CurrentUser() user: JwtPayload) {
     return this.usersService.findById(clinicId, user.sub);
   }
 

@@ -38,6 +38,11 @@ export class AddPhotoDto {
   @IsMongoId()
   transactionId?: string;
 
+  // Vínculo opcional a un trabajo (item del plan de tratamiento).
+  @IsOptional()
+  @IsMongoId()
+  treatmentItemId?: string;
+
   @IsOptional()
   @IsNumber()
   toothNumber?: number;
@@ -70,6 +75,11 @@ export class UpdatePhotoDto {
   @IsOptional()
   @IsString()
   transactionId?: string;
+
+  // Vínculo a un trabajo. String de ObjectId para vincular, '' para desvincular.
+  @IsOptional()
+  @IsString()
+  treatmentItemId?: string;
 
   @IsOptional()
   @IsNumber()
