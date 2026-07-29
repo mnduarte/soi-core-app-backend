@@ -19,6 +19,7 @@ import { DayNotesModule } from './modules/day-notes/day-notes.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { BannersModule } from './modules/banners/banners.module';
+import { ChangesModule } from './modules/changes/changes.module';
 import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
 import { AdminModule } from './modules/admin/admin.module';
 
@@ -57,6 +58,7 @@ import { AdminModule } from './modules/admin/admin.module';
     GalleryModule,
     TransactionsModule,
     BannersModule,
+    ChangesModule,
     AdminAuthModule,
     AdminModule,
   ],
