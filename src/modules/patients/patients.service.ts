@@ -142,7 +142,9 @@ export class PatientsService {
   ) {
     const parts = dto.fullName.trim().split(/\s+/);
     const name = parts[0];
-    const lastName = parts.slice(1).join(' ') || '—'; // Guión si no hay apellido
+    // Sin apellido queda vacío (no '—'): el schema ya no lo exige y el display
+    // concatena name+lastName, así un solo nombre se ve limpio ("Bruno").
+    const lastName = parts.slice(1).join(' ');
     return this.patientModel.create({
       name,
       lastName,

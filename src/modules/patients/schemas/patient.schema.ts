@@ -12,7 +12,11 @@ export class Patient extends BaseEntity {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true })
+  // El nombre se carga en un solo campo en el front (splitName parte por el
+  // primer espacio). Un paciente de un solo nombre ("Bruno") queda con lastName
+  // vacío, así que NO puede ser required — Mongoose rechaza '' en un String
+  // required y tiraba 500 al crear desde el modal completo.
+  @Prop({ default: '' })
   lastName: string;
 
   @Prop()
