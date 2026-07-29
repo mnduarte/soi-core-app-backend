@@ -114,10 +114,12 @@ export class TransactionsService {
     if (opts?.type) filter.type = opts.type;
 
     // Rango de fechas sobre `date` (el modal de Pagos filtra por período).
+    // Anclado a hora Argentina (UTC-3): el server corre en UTC pero el front
+    // muestra las fechas en ART; sin el offset el borde de medianoche no coincide.
     if (opts?.from || opts?.to) {
       const range: Record<string, Date> = {};
-      if (opts.from) range.$gte = new Date(`${opts.from}T00:00:00`);
-      if (opts.to) range.$lte = new Date(`${opts.to}T23:59:59.999`);
+      if (opts.from) range.$gte = new Date(`${opts.from}T00:00:00-03:00`);
+      if (opts.to) range.$lte = new Date(`${opts.to}T23:59:59.999-03:00`);
       filter.date = range;
     }
 

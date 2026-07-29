@@ -73,11 +73,14 @@ export class WorksService {
     }
 
     // Rango de fecha (inputs date-only YYYY-MM-DD): 'from' al inicio del día y
-    // 'to' al final, interpretados en hora local del server para no perder el día.
+    // 'to' al final, anclados a hora Argentina (UTC-3). El server corre en UTC,
+    // pero el front muestra las fechas en ART; sin el offset, un trabajo cerca
+    // de medianoche caía de un lado distinto entre lo que se ve y lo que filtra.
+    // SOI es solo Argentina y sin DST, así que -03:00 es fijo.
     if (opts?.from || opts?.to) {
       const range: Record<string, Date> = {};
-      if (opts.from) range.$gte = new Date(`${opts.from}T00:00:00`);
-      if (opts.to) range.$lte = new Date(`${opts.to}T23:59:59.999`);
+      if (opts.from) range.$gte = new Date(`${opts.from}T00:00:00-03:00`);
+      if (opts.to) range.$lte = new Date(`${opts.to}T23:59:59.999-03:00`);
       filter[dateField] = range;
     }
 
