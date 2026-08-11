@@ -179,7 +179,90 @@ export class PatientsService {
       });
     }
 
-    return this.patientModel.find(filter).sort({ lastName: 1, name: 1 }).exec();
+    const patients = await this.patientModel
+      .find(filter)
+      .sort({ lastName: 1, name: 1 })
+      .exec();
+
+    return this.withListStats(clinicId, patients);
+  }
+
+  // Enriquece la lista de pacientes con los datos que muestra la tabla:
+  // última visita, cantidad de turnos y saldo. Son campos CALCULADOS (no se
+  // persisten): 3 aggregates scopeados a la clínica, no uno por paciente, así
+  // que el costo no crece con la cantidad de pacientes.
+  //
+  // El saldo sigue el modelo "Falta cobrar" de la ficha:
+  //   saldo = Σ(precio de trabajos HECHOS) − Σ(pagos)   → > 0 significa que debe.
+  // Se ignoran los CHARGE legacy a propósito, para que la lista muestre
+  // exactamente el mismo número que la ficha del paciente.
+  private async withListStats(clinicId: string, patients: PatientDocument[]) {
+    if (patients.length === 0) return [];
+
+    const cid = new Types.ObjectId(clinicId);
+    const now = new Date();
+
+    const [visits, done, paid] = await Promise.all([
+      // Turnos: total + fecha del último ya ocurrido (excluye cancelados).
+      this.connection
+        .collection('appointments')
+        .aggregate([
+          {
+            $match: {
+              clinicId: cid,
+              deletedAt: null,
+              status: { $nin: ['CANCELLED'] },
+            },
+          },
+          {
+            $group: {
+              _id: '$patientId',
+              count: { $sum: 1 },
+              lastVisitAt: {
+                $max: {
+                  $cond: [{ $lte: ['$startsAt', now] }, '$startsAt', null],
+                },
+              },
+            },
+          },
+        ])
+        .toArray(),
+      // Trabajos hechos → lo realizado (lo que se puede cobrar).
+      this.connection
+        .collection('works')
+        .aggregate([
+          { $match: { clinicId: cid, deletedAt: null, status: 'COMPLETED' } },
+          { $group: { _id: '$patientId', total: { $sum: '$price' } } },
+        ])
+        .toArray(),
+      // Pagos del paciente.
+      this.connection
+        .collection('transactions')
+        .aggregate([
+          { $match: { clinicId: cid, type: 'PAYMENT', voidedAt: null } },
+          { $group: { _id: '$patientId', total: { $sum: '$amount' } } },
+        ])
+        .toArray(),
+    ]);
+
+    const byId = <T extends { _id: unknown }>(rows: T[]) =>
+      new Map(rows.map((r) => [String(r._id), r]));
+    const visitMap = byId(visits as { _id: unknown; count: number; lastVisitAt: Date | null }[]);
+    const doneMap = byId(done as { _id: unknown; total: number }[]);
+    const paidMap = byId(paid as { _id: unknown; total: number }[]);
+
+    return patients.map((p) => {
+      const id = String(p._id);
+      const v = visitMap.get(id);
+      const realizado = doneMap.get(id)?.total ?? 0;
+      const pagado = paidMap.get(id)?.total ?? 0;
+      return {
+        ...p.toObject(),
+        lastVisitAt: v?.lastVisitAt ?? null,
+        appointmentsCount: v?.count ?? 0,
+        balance: realizado - pagado,
+      };
+    });
   }
 
   async findById(clinicId: string, patientId: string) {
