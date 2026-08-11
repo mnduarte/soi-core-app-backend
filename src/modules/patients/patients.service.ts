@@ -179,26 +179,39 @@ export class PatientsService {
       });
     }
 
-    const patients = await this.patientModel
-      .find(filter)
-      .sort({ lastName: 1, name: 1 })
-      .exec();
+    // Las estadísticas NO dependen de qué pacientes devuelva el find (se agrupan
+    // por patientId sobre toda la clínica), así que se lanzan en paralelo con él.
+    // Contra Atlas el costo dominante es la latencia de red, no el cálculo: en
+    // serie eran dos viajes encadenados, así queda uno solo.
+    const [patients, stats] = await Promise.all([
+      this.patientModel.find(filter).sort({ lastName: 1, name: 1 }).exec(),
+      this.listStats(clinicId),
+    ]);
 
-    return this.withListStats(clinicId, patients);
+    return patients.map((p) => {
+      const id = String(p._id);
+      const v = stats.visits.get(id);
+      const realizado = stats.done.get(id) ?? 0;
+      const pagado = stats.paid.get(id) ?? 0;
+      return {
+        ...p.toObject(),
+        lastVisitAt: v?.lastVisitAt ?? null,
+        appointmentsCount: v?.count ?? 0,
+        balance: realizado - pagado,
+      };
+    });
   }
 
-  // Enriquece la lista de pacientes con los datos que muestra la tabla:
-  // última visita, cantidad de turnos y saldo. Son campos CALCULADOS (no se
-  // persisten): 3 aggregates scopeados a la clínica, no uno por paciente, así
-  // que el costo no crece con la cantidad de pacientes.
+  // Estadísticas del listado (última visita, turnos y saldo) como campos
+  // CALCULADOS, no persistidos. Son 3 aggregates scopeados a la CLÍNICA y
+  // agrupados por paciente — no uno por paciente —, así que el costo no crece
+  // con la cantidad de fichas. Los tres van por índice.
   //
   // El saldo sigue el modelo "Falta cobrar" de la ficha:
   //   saldo = Σ(precio de trabajos HECHOS) − Σ(pagos)   → > 0 significa que debe.
   // Se ignoran los CHARGE legacy a propósito, para que la lista muestre
   // exactamente el mismo número que la ficha del paciente.
-  private async withListStats(clinicId: string, patients: PatientDocument[]) {
-    if (patients.length === 0) return [];
-
+  private async listStats(clinicId: string) {
     const cid = new Types.ObjectId(clinicId);
     const now = new Date();
 
@@ -245,24 +258,19 @@ export class PatientsService {
         .toArray(),
     ]);
 
-    const byId = <T extends { _id: unknown }>(rows: T[]) =>
-      new Map(rows.map((r) => [String(r._id), r]));
-    const visitMap = byId(visits as { _id: unknown; count: number; lastVisitAt: Date | null }[]);
-    const doneMap = byId(done as { _id: unknown; total: number }[]);
-    const paidMap = byId(paid as { _id: unknown; total: number }[]);
+    const totalsById = (rows: { _id: unknown; total: number }[]) =>
+      new Map(rows.map((r) => [String(r._id), r.total]));
 
-    return patients.map((p) => {
-      const id = String(p._id);
-      const v = visitMap.get(id);
-      const realizado = doneMap.get(id)?.total ?? 0;
-      const pagado = paidMap.get(id)?.total ?? 0;
-      return {
-        ...p.toObject(),
-        lastVisitAt: v?.lastVisitAt ?? null,
-        appointmentsCount: v?.count ?? 0,
-        balance: realizado - pagado,
-      };
-    });
+    return {
+      visits: new Map(
+        (visits as { _id: unknown; count: number; lastVisitAt: Date | null }[]).map((r) => [
+          String(r._id),
+          r,
+        ]),
+      ),
+      done: totalsById(done as { _id: unknown; total: number }[]),
+      paid: totalsById(paid as { _id: unknown; total: number }[]),
+    };
   }
 
   async findById(clinicId: string, patientId: string) {
