@@ -22,6 +22,11 @@ export class CreateTransactionDto {
   @Min(0.01)
   amount: number;
 
+  // Trabajo al que se imputa el pago. Omitir = pago a cuenta.
+  @IsOptional()
+  @IsMongoId()
+  workId?: string;
+
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
@@ -40,6 +45,12 @@ export class UpdateTransactionDto {
   @IsOptional()
   @IsEnum(TransactionType)
   type?: TransactionType;
+
+  // Vincular (o desvincular con '') un pago ya cargado a un trabajo. Sirve para
+  // los pagos viejos, que quedaron sin trabajo asignado.
+  @IsOptional()
+  @IsString()
+  workId?: string;
 
   @IsOptional()
   @IsNumber()

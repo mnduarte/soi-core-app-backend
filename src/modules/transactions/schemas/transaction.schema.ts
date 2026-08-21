@@ -49,6 +49,13 @@ export class Transaction extends BaseEntity {
   @Prop({ default: Date.now })
   date: Date;
 
+  // Trabajo al que corresponde este pago. Permite mostrar "pagó $X de $Y" en la
+  // fila del trabajo (pedido del Dr.: ver cuánto lleva pagado de un tratamiento
+  // largo). Si es null, es un pago a cuenta, no atado a un trabajo puntual.
+  // OJO: la fórmula de "Falta cobrar" NO cambia — sigue sumando TODOS los pagos.
+  @Prop({ type: Types.ObjectId, ref: 'Work' })
+  workId?: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'Transaction' })
   relatedTransactionId?: Types.ObjectId;
 
@@ -63,3 +70,4 @@ export const TransactionSchema = SchemaFactory.createForClass(Transaction);
 
 TransactionSchema.index({ clinicId: 1, patientId: 1, createdAt: -1 });
 TransactionSchema.index({ clinicId: 1, createdAt: -1 });
+TransactionSchema.index({ clinicId: 1, patientId: 1, workId: 1 });

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Types, Connection } from 'mongoose';
 import { Work, WorkDocument, WorkStatus } from './schemas/work.schema';
 import { CreateWorkDto, UpdateWorkDto } from './dto/work.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
@@ -16,7 +16,32 @@ const PENDING_STATUSES = [
 
 @Injectable()
 export class WorksService {
-  constructor(@InjectModel(Work.name) private workModel: Model<WorkDocument>) {}
+  constructor(
+    @InjectModel(Work.name) private workModel: Model<WorkDocument>,
+    @InjectConnection() private readonly connection: Connection,
+  ) {}
+
+  // Cuánto se pagó de cada trabajo. Un solo aggregate por paciente (agrupado por
+  // workId), no uno por trabajo. Sirve para mostrar "pagó $200.000 de $600.000"
+  // en tratamientos largos, que es lo que pidió el Dr.
+  private async paidByWork(clinicId: string, patientId: string) {
+    const rows = await this.connection
+      .collection('transactions')
+      .aggregate([
+        {
+          $match: {
+            clinicId: new Types.ObjectId(clinicId),
+            patientId: new Types.ObjectId(patientId),
+            type: 'PAYMENT',
+            voidedAt: null,
+            workId: { $ne: null },
+          },
+        },
+        { $group: { _id: '$workId', total: { $sum: '$amount' } } },
+      ])
+      .toArray();
+    return new Map(rows.map((r) => [String(r._id), r.total as number]));
+  }
 
   async create(clinicId: string, dto: CreateWorkDto, requester: JwtPayload) {
     const status = dto.status ?? WorkStatus.PROPOSED;
@@ -97,7 +122,18 @@ export class WorksService {
 
     const query = this.workModel.find(filter).sort(sort);
     if (opts?.limit && opts.limit > 0) query.limit(opts.limit);
-    return query.exec();
+
+    // `paid` es CALCULADO (no se persiste): la suma de los pagos imputados a
+    // cada trabajo. Va en paralelo con el find porque no depende de su resultado.
+    const [works, paid] = await Promise.all([
+      query.exec(),
+      this.paidByWork(clinicId, patientId),
+    ]);
+
+    return works.map((w) => ({
+      ...w.toObject(),
+      paid: paid.get(String(w._id)) ?? 0,
+    }));
   }
 
   // Resumen para la barra "Falta cobrar": total realizado (Σ precio de HECHOS),

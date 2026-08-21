@@ -39,6 +39,7 @@ export class TransactionsService {
     return this.transactionModel.create({
       clinicId: new Types.ObjectId(clinicId),
       patientId: new Types.ObjectId(dto.patientId),
+      workId: dto.workId ? new Types.ObjectId(dto.workId) : undefined,
       type,
       amount: dto.amount,
       paymentMethod: dto.paymentMethod,
@@ -76,6 +77,11 @@ export class TransactionsService {
       tx.type = dto.type;
     }
     if (dto.amount != null) tx.amount = dto.amount;
+    // '' desvincula, un id vincula. `!== undefined` para distinguir "no lo
+    // mandaron" de "lo mandaron vacío a propósito".
+    if (dto.workId !== undefined) {
+      tx.workId = dto.workId ? new Types.ObjectId(dto.workId) : undefined;
+    }
     if (dto.paymentMethod != null) tx.paymentMethod = dto.paymentMethod;
     if (dto.description != null) tx.description = dto.description;
     if (dto.date) tx.date = new Date(dto.date);
@@ -105,6 +111,7 @@ export class TransactionsService {
       q?: string;
       type?: string;
       limit?: number;
+      workId?: string;
     },
   ) {
     const filter: Record<string, unknown> = {
@@ -112,6 +119,8 @@ export class TransactionsService {
     };
     if (patientId) filter.patientId = new Types.ObjectId(patientId);
     if (opts?.type) filter.type = opts.type;
+    // Pagos imputados a un trabajo puntual (se usa al destildar "cobrado").
+    if (opts?.workId) filter.workId = new Types.ObjectId(opts.workId);
 
     // Rango de fechas sobre `date` (el modal de Pagos filtra por período).
     // Anclado a hora Argentina (UTC-3): el server corre en UTC pero el front
@@ -135,7 +144,11 @@ export class TransactionsService {
       filter.$or = or;
     }
 
-    const query = this.transactionModel.find(filter).sort({ date: -1 });
+    // `_id` como desempate: los pagos de un mismo día comparten la hora
+    // (mediodía), así que ordenar solo por `date` dejaba el orden librado al
+    // azar y cambiaba entre consultas. El ObjectId codifica el instante de
+    // creación, así que `_id: -1` equivale a "el último cargado primero".
+    const query = this.transactionModel.find(filter).sort({ date: -1, _id: -1 });
     if (opts?.limit && opts.limit > 0) query.limit(opts.limit);
     return query.exec();
   }

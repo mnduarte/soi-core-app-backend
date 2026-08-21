@@ -48,12 +48,15 @@ export class TransactionsController {
     @Query('q') q?: string,
     @Query('type') type?: string,
     @Query('limit') limit?: string,
+    // Pagos de un trabajo puntual (para destildar "cobrado" en la ficha).
+    @Query('workId') workId?: string,
   ) {
     return this.transactionsService.findAll(clinicId, patientId, {
       from,
       to,
       q,
       type,
+      workId,
       limit: limit ? Number(limit) : undefined,
     });
   }
