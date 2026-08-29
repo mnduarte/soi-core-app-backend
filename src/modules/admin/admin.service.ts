@@ -26,6 +26,12 @@ import {
   AdminSettingsDocument,
 } from './schemas/admin-settings.schema';
 import {
+  ClinicPayment,
+  ClinicPaymentDocument,
+  PaymentMethod,
+} from './schemas/clinic-payment.schema';
+import { MercadoPagoService } from '../mercadopago/mercadopago.service';
+import {
   PasswordResetRequest,
   PasswordResetRequestDocument,
 } from './schemas/password-reset-request.schema';
@@ -83,6 +89,9 @@ export class AdminService {
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
     @InjectModel(AdminSettings.name)
     private adminSettingsModel: Model<AdminSettingsDocument>,
+    @InjectModel(ClinicPayment.name)
+    private clinicPaymentModel: Model<ClinicPaymentDocument>,
+    private mercadoPago: MercadoPagoService,
     @InjectModel(PasswordResetRequest.name)
     private resetRequestModel: Model<PasswordResetRequestDocument>,
     private jwtService: JwtService,
@@ -118,6 +127,13 @@ export class AdminService {
    * Positive = days left; negative = days overdue; `null` if the relevant
    * date isn't set yet.
    */
+  // Precio que paga ESTE consultorio: el suyo si tiene uno negociado, si no el
+  // de lista. Un solo lugar donde se resuelve, para que el backoffice, el pago
+  // y (mañana) la suscripción de Mercado Pago no puedan discrepar.
+  private effectivePrice(clinic: Clinic, globalPrice: number): number {
+    return clinic.planPriceMonthly ?? globalPrice;
+  }
+
   private computeDaysToDue(clinic: Clinic): number | null {
     const target =
       clinic.status === SubscriptionStatus.TRIAL
@@ -147,7 +163,11 @@ export class AdminService {
   // Clinic list / detail — enriched with patientsCount, lastLoginAt, payment
   // ---------------------------------------------------------------------------
 
-  private async enrichClinic(clinic: ClinicDocument, gracePeriodDays: number) {
+  private async enrichClinic(
+    clinic: ClinicDocument,
+    gracePeriodDays: number,
+    planPriceMonthly: number,
+  ) {
     const clinicId = clinic._id;
     const [patientsCount, lastUser, owner] = await Promise.all([
       this.patientModel.countDocuments({ clinicId, deletedAt: null }),
@@ -192,6 +212,16 @@ export class AdminService {
       daysToDue,
       paymentStatus,
       activated,
+      // `planPriceMonthly` es lo negociado con este consultorio (null = usa el
+      // de lista) y `effectivePrice` es lo que realmente paga. Van los dos: el
+      // backoffice necesita distinguir "no tiene precio propio" de "tiene uno
+      // que coincide con el global".
+      planPriceMonthly: clinic.planPriceMonthly ?? null,
+      effectivePrice: this.effectivePrice(clinic, planPriceMonthly),
+      mpPreapprovalStatus: clinic.mpPreapprovalStatus ?? null,
+      mpInitPoint: clinic.mpInitPoint ?? null,
+      mpFirstChargeAt: clinic.mpFirstChargeAt ?? null,
+      mpLastFailureAt: clinic.mpLastFailureAt ?? null,
     };
   }
 
@@ -208,7 +238,13 @@ export class AdminService {
       this.clinicModel.countDocuments({ deletedAt: null }),
     ]);
     const enriched = await Promise.all(
-      clinics.map((c) => this.enrichClinic(c, settings.gracePeriodDays)),
+      clinics.map((c) =>
+        this.enrichClinic(
+          c,
+          settings.gracePeriodDays,
+          settings.planPriceMonthly,
+        ),
+      ),
     );
     return { clinics: enriched, total, page, limit };
   }
@@ -219,7 +255,11 @@ export class AdminService {
       .exec();
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -287,7 +327,11 @@ export class AdminService {
       mustChangePassword: true,
     });
 
-    const enriched = await this.enrichClinic(clinic, settings.gracePeriodDays);
+    const enriched = await this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
 
     return {
       clinic: enriched,
@@ -336,7 +380,11 @@ export class AdminService {
     }
 
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -356,7 +404,11 @@ export class AdminService {
       clinic.subscriptionEndsAt = new Date(dto.subscriptionEndsAt);
     await clinic.save();
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
   async extendSubscription(clinicId: string, dto: ExtendSubscriptionDto) {
@@ -373,22 +425,116 @@ export class AdminService {
     }
     await clinic.save();
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
-  async recordPayment(clinicId: string, dto: RecordPaymentDto) {
+  async recordPayment(
+    clinicId: string,
+    dto: RecordPaymentDto,
+    adminId?: string,
+  ) {
     const clinic = await this.clinicModel
       .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
       .exec();
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
+    const settings = await this.getSettings();
+
     const days = dto.days ?? DEFAULT_PAYMENT_DAYS;
     // Pago renueva la suscripción desde hoy (no se acumula desde una fecha
     // vencida — el dentista paga "el próximo mes" desde el momento del pago).
-    clinic.subscriptionEndsAt = new Date(Date.now() + days * MS_PER_DAY);
+    const periodFrom = new Date();
+    const periodTo = new Date(periodFrom.getTime() + days * MS_PER_DAY);
+
+    // El pago queda ASENTADO, no solo corrida la fecha de vencimiento. Es lo
+    // que después permite conciliar contra Mercado Pago y contestar "¿desde
+    // cuándo paga?" sin adivinar.
+    await this.clinicPaymentModel.create({
+      clinicId: clinic._id,
+      amount:
+        dto.amount ?? this.effectivePrice(clinic, settings.planPriceMonthly),
+      paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+      method: dto.method ?? PaymentMethod.TRANSFER,
+      periodFrom,
+      periodTo,
+      notes: dto.notes,
+      recordedBy: adminId ? new Types.ObjectId(adminId) : undefined,
+    });
+
+    clinic.subscriptionEndsAt = periodTo;
     clinic.status = SubscriptionStatus.ACTIVE;
     await clinic.save();
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
+  }
+
+  // Historial de pagos del consultorio, del más reciente al más viejo.
+  async listPayments(clinicId: string, limit = 60) {
+    return this.clinicPaymentModel
+      .find({ clinicId: new Types.ObjectId(clinicId), deletedAt: null })
+      .sort({ paidAt: -1, _id: -1 })
+      .limit(limit)
+      .exec();
+  }
+
+  // Borrado real: un pago mal cargado no debe seguir sumando en los totales.
+  // No revierte `subscriptionEndsAt` a propósito — la vigencia se corrige a
+  // mano, que es una decisión aparte de "este pago no existió".
+  async deletePayment(clinicId: string, paymentId: string) {
+    const res = await this.clinicPaymentModel
+      .deleteOne({
+        _id: new Types.ObjectId(paymentId),
+        clinicId: new Types.ObjectId(clinicId),
+      })
+      .exec();
+    if (res.deletedCount === 0)
+      throw new NotFoundException('Pago no encontrado');
+    return { ok: true };
+  }
+
+  // ---- Débito automático ----
+  // El monto sale del precio efectivo del consultorio y no del body: que el
+  // backoffice pueda mandar cualquier número sería un agujero — quien tenga el
+  // token de admin podría crear una suscripción de $1.
+  async createMpSubscription(clinicId: string) {
+    const clinic = await this.clinicModel
+      .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
+      .exec();
+    if (!clinic) throw new NotFoundException('Clínica no encontrada');
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    const amount = this.effectivePrice(clinic, settings.planPriceMonthly);
+    return this.mercadoPago.createSubscription(clinicId, amount);
+  }
+
+  cancelMpSubscription(clinicId: string) {
+    return this.mercadoPago.cancelSubscription(clinicId);
+  }
+
+  syncMpSubscription(clinicId: string) {
+    return this.mercadoPago.syncSubscription(clinicId);
+  }
+
+  // Precio propio del consultorio. `null` lo devuelve al precio de lista.
+  async updateClinicPrice(clinicId: string, planPriceMonthly?: number | null) {
+    const clinic = await this.clinicModel
+      .findOne({ _id: new Types.ObjectId(clinicId), deletedAt: null })
+      .exec();
+    if (!clinic) throw new NotFoundException('Clínica no encontrada');
+    clinic.planPriceMonthly =
+      planPriceMonthly == null ? undefined : planPriceMonthly;
+    await clinic.save();
+    const settings = await this.getSettings();
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
   async suspendClinic(clinicId: string) {
@@ -399,7 +545,11 @@ export class AdminService {
     clinic.status = SubscriptionStatus.SUSPENDED;
     await clinic.save();
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
   async reactivateClinic(clinicId: string) {
@@ -415,7 +565,11 @@ export class AdminService {
     }
     await clinic.save();
     const settings = await this.getSettings();
-    return this.enrichClinic(clinic, settings.gracePeriodDays);
+    return this.enrichClinic(
+      clinic,
+      settings.gracePeriodDays,
+      settings.planPriceMonthly,
+    );
   }
 
   // ---------------------------------------------------------------------------

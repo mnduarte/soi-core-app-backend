@@ -22,6 +22,7 @@ import { BannersModule } from './modules/banners/banners.module';
 import { ChangesModule } from './modules/changes/changes.module';
 import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { MercadoPagoModule } from './modules/mercadopago/mercadopago.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { AdminModule } from './modules/admin/admin.module';
     ChangesModule,
     AdminAuthModule,
     AdminModule,
+    MercadoPagoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

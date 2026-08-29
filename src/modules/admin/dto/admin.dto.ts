@@ -6,15 +6,26 @@ import {
   IsHexColor,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
+import { PaymentMethod } from '../schemas/clinic-payment.schema';
 
 export enum ClinicStatusUpdate {
   TRIAL = 'TRIAL',
   ACTIVE = 'ACTIVE',
   SUSPENDED = 'SUSPENDED',
+}
+
+export class UpdateClinicPriceDto {
+  // null / vacío = vuelve a usar el precio global de admin_settings.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  planPriceMonthly?: number | null;
 }
 
 export class UpdateClinicSubscriptionDto {
@@ -151,6 +162,26 @@ export class RecordPaymentDto {
   @IsInt()
   @Min(1)
   days?: number;
+
+  // Monto cobrado. Si no viene se usa el precio efectivo del consultorio (el
+  // suyo o el global): el caso normal es "pagó lo de siempre".
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amount?: number;
+
+  @IsOptional()
+  @IsDateString()
+  paidAt?: string;
+
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  notes?: string;
 }
 
 export class UpdateAdminSettingsDto {

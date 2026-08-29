@@ -16,7 +16,12 @@ import {
   PasswordResetRequest,
   PasswordResetRequestSchema,
 } from './schemas/password-reset-request.schema';
+import {
+  ClinicPayment,
+  ClinicPaymentSchema,
+} from './schemas/clinic-payment.schema';
 import { TelegramService } from './telegram.service';
+import { MercadoPagoModule } from '../mercadopago/mercadopago.module';
 
 @Module({
   imports: [
@@ -27,7 +32,9 @@ import { TelegramService } from './telegram.service';
       { name: Patient.name, schema: PatientSchema },
       { name: AdminSettings.name, schema: AdminSettingsSchema },
       { name: PasswordResetRequest.name, schema: PasswordResetRequestSchema },
+      { name: ClinicPayment.name, schema: ClinicPaymentSchema },
     ]),
+    MercadoPagoModule,
     // Same JWT secret/expiry as the user auth module so the impersonation
     // token validates through the existing JwtAuthGuard — we just inject an
     // `imp: true` flag in the payload.

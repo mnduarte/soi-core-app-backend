@@ -90,6 +90,34 @@ export class Clinic extends BaseEntity {
   @Prop()
   subscriptionEndsAt?: Date;
 
+  // Precio mensual de ESTE consultorio. Vacío = usa el global de
+  // admin_settings. Se guarda solo cuando se negoció algo distinto: hoy todos
+  // pagan lo mismo y repetir el número en cada clínica obliga a tocarlas una
+  // por una el día que cambie el precio de lista.
+  @Prop({ min: 0 })
+  planPriceMonthly?: number;
+
+  // ---- Débito automático (Mercado Pago) ----
+  // `preapproval` es la suscripción del lado de MP. Guardamos el id para poder
+  // consultarla y cancelarla, el estado para mostrarlo sin pegarle a MP en cada
+  // listado, y el link mientras esté pendiente de que el dentista lo autorice.
+  @Prop({ index: true })
+  mpPreapprovalId?: string;
+
+  @Prop({ enum: ['pending', 'authorized', 'paused', 'cancelled'] })
+  mpPreapprovalStatus?: string;
+
+  @Prop()
+  mpInitPoint?: string;
+
+  @Prop()
+  mpFirstChargeAt?: Date;
+
+  // Último cobro rechazado. No suspende nada por sí solo (MP reintenta unos
+  // días); sirve para que el backoffice lo muestre y se pueda avisar.
+  @Prop()
+  mpLastFailureAt?: Date;
+
   @Prop({ default: '#2F54EB' })
   brandColor: string;
 

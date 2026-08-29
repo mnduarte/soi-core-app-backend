@@ -21,6 +21,7 @@ import {
   CreateClinicUserDto,
   ExtendSubscriptionDto,
   RecordPaymentDto,
+  UpdateClinicPriceDto,
   UpdateAdminSettingsDto,
   UpdateClinicDto,
   UpdateClinicSubscriptionDto,
@@ -91,8 +92,50 @@ export class AdminController {
   }
 
   @Post('clinics/:id/payment')
-  recordPayment(@Param('id') id: string, @Body() dto: RecordPaymentDto) {
-    return this.adminService.recordPayment(id, dto);
+  recordPayment(
+    @Param('id') id: string,
+    @Body() dto: RecordPaymentDto,
+    @Req() req: Request & { admin?: { sub: string } },
+  ) {
+    return this.adminService.recordPayment(id, dto, req.admin?.sub);
+  }
+
+  @Get('clinics/:id/payments')
+  listPayments(@Param('id') id: string) {
+    return this.adminService.listPayments(id);
+  }
+
+  @Delete('clinics/:id/payments/:paymentId')
+  deletePayment(
+    @Param('id') id: string,
+    @Param('paymentId') paymentId: string,
+  ) {
+    return this.adminService.deletePayment(id, paymentId);
+  }
+
+  // Débito automático. Devuelve el link para que el consultorio autorice.
+  @Post('clinics/:id/mp-subscription')
+  createMpSubscription(@Param('id') id: string) {
+    return this.adminService.createMpSubscription(id);
+  }
+
+  @Delete('clinics/:id/mp-subscription')
+  cancelMpSubscription(@Param('id') id: string) {
+    return this.adminService.cancelMpSubscription(id);
+  }
+
+  // Relee el estado en MP, por si se autorizó y el webhook no llegó.
+  @Post('clinics/:id/mp-subscription/sync')
+  syncMpSubscription(@Param('id') id: string) {
+    return this.adminService.syncMpSubscription(id);
+  }
+
+  @Patch('clinics/:id/price')
+  updateClinicPrice(
+    @Param('id') id: string,
+    @Body() dto: UpdateClinicPriceDto,
+  ) {
+    return this.adminService.updateClinicPrice(id, dto.planPriceMonthly);
   }
 
   @Post('clinics/:id/suspend')
