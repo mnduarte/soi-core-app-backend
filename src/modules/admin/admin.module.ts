@@ -9,6 +9,10 @@ import { User, UserSchema } from '../users/schemas/user.schema';
 import { Banner, BannerSchema } from '../banners/schemas/banner.schema';
 import { Patient, PatientSchema } from '../patients/schemas/patient.schema';
 import {
+  Appointment,
+  AppointmentSchema,
+} from '../appointments/schemas/appointment.schema';
+import {
   AdminSettings,
   AdminSettingsSchema,
 } from './schemas/admin-settings.schema';
@@ -30,6 +34,7 @@ import { MercadoPagoModule } from '../mercadopago/mercadopago.module';
       { name: User.name, schema: UserSchema },
       { name: Banner.name, schema: BannerSchema },
       { name: Patient.name, schema: PatientSchema },
+      { name: Appointment.name, schema: AppointmentSchema },
       { name: AdminSettings.name, schema: AdminSettingsSchema },
       { name: PasswordResetRequest.name, schema: PasswordResetRequestSchema },
       { name: ClinicPayment.name, schema: ClinicPaymentSchema },

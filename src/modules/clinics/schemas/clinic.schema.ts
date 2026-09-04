@@ -87,6 +87,21 @@ export class Clinic extends BaseEntity {
   @Prop()
   trialEndsAt?: Date;
 
+  /**
+   * Última vez que el consultorio tuvo la app ABIERTA Y A LA VISTA.
+   *
+   * No es el login: `lastLoginAt` (en el usuario) contesta "cuándo entró", que
+   * puede ser hace tres horas mientras está trabajando ahora mismo. Esto lo
+   * escribe el latido de `/changes`, que el front deja de mandar cuando la
+   * pestaña pasa a segundo plano — así que es una señal bastante literal de
+   * "hay alguien con la app delante".
+   *
+   * Se escribe como mucho una vez cada pocos minutos (ver ChangesService), no
+   * en cada latido.
+   */
+  @Prop()
+  lastSeenAt?: Date;
+
   @Prop()
   subscriptionEndsAt?: Date;
 

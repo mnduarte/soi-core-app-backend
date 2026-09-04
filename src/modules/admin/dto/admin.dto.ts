@@ -8,6 +8,7 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  Max,
   IsString,
   MaxLength,
   Min,
@@ -163,8 +164,16 @@ export class RecordPaymentDto {
   @Min(1)
   days?: number;
 
-  // Monto cobrado. Si no viene se usa el precio efectivo del consultorio (el
-  // suyo o el global): el caso normal es "pagó lo de siempre".
+  // Cuantos meses cubre el pago. Se suman a partir de lo que ya tiene cubierto,
+  // asi el pago adelantado no pisa lo anterior.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  months?: number;
+
+  // Monto cobrado. Si no viene se usa el precio efectivo del consultorio
+  // multiplicado por los meses: el caso normal es "pago lo de siempre".
   @IsOptional()
   @IsNumber()
   @Min(0)

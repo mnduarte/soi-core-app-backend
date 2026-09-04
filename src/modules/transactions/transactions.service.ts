@@ -148,7 +148,9 @@ export class TransactionsService {
     // (mediodía), así que ordenar solo por `date` dejaba el orden librado al
     // azar y cambiaba entre consultas. El ObjectId codifica el instante de
     // creación, así que `_id: -1` equivale a "el último cargado primero".
-    const query = this.transactionModel.find(filter).sort({ date: -1, _id: -1 });
+    const query = this.transactionModel
+      .find(filter)
+      .sort({ date: -1, _id: -1 });
     if (opts?.limit && opts.limit > 0) query.limit(opts.limit);
     return query.exec();
   }

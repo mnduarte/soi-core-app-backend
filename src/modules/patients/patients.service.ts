@@ -263,10 +263,9 @@ export class PatientsService {
 
     return {
       visits: new Map(
-        (visits as { _id: unknown; count: number; lastVisitAt: Date | null }[]).map((r) => [
-          String(r._id),
-          r,
-        ]),
+        (
+          visits as { _id: unknown; count: number; lastVisitAt: Date | null }[]
+        ).map((r) => [String(r._id), r]),
       ),
       done: totalsById(done as { _id: unknown; total: number }[]),
       paid: totalsById(paid as { _id: unknown; total: number }[]),

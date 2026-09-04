@@ -38,23 +38,12 @@ import {
 import { TelegramService } from '../admin/telegram.service';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { addDays } from 'date-fns';
+import { isReadonly, isFullyBlocked } from '../../common/subscription.policy';
 
-function isReadonly(clinic: Clinic): boolean {
-  if (clinic.status === SubscriptionStatus.SUSPENDED) return true;
-  if (clinic.subscriptionEndsAt && clinic.subscriptionEndsAt < new Date()) {
-    const graceEnd = addDays(clinic.subscriptionEndsAt, 7);
-    return new Date() < graceEnd;
-  }
-  return false;
-}
-
-function isFullyBlocked(clinic: Clinic): boolean {
-  if (clinic.subscriptionEndsAt && clinic.subscriptionEndsAt < new Date()) {
-    const graceEnd = addDays(clinic.subscriptionEndsAt, 7);
-    return new Date() >= graceEnd;
-  }
-  return false;
-}
+// Los días de mora ya no viven acá: los define `subscription.policy`, que es
+// también de donde sale el estado que ve el cartel del front. Antes estaban
+// duplicados (dos `addDays(…, 7)`) y el aviso los calculaba por su cuenta, así
+// que podía prometer algo distinto de lo que el sistema hacía.
 
 // How many devices can stay logged in at the same time per user. A 3rd login
 // evicts the oldest session, so a person's own laptop + phone coexist.

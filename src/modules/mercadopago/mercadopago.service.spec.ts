@@ -4,7 +4,12 @@ import { MercadoPagoService } from './mercadopago.service';
 
 const SECRET = 'clave-de-prueba';
 
-function firmar(dataId: string, requestId: string, ts: string, secret = SECRET) {
+function firmar(
+  dataId: string,
+  requestId: string,
+  ts: string,
+  secret = SECRET,
+) {
   const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
   return createHmac('sha256', secret).update(manifest).digest('hex');
 }
@@ -41,12 +46,16 @@ describe('MercadoPagoService.verifySignature', () => {
 
   it('rechaza si cambia el id (una notificación reapuntada a otro cobro)', () => {
     const v1 = firmar(ID, RID, TS);
-    expect(svc.verifySignature(`ts=${TS},v1=${v1}`, RID, '11112222')).toBe(false);
+    expect(svc.verifySignature(`ts=${TS},v1=${v1}`, RID, '11112222')).toBe(
+      false,
+    );
   });
 
   it('rechaza si cambia el request-id', () => {
     const v1 = firmar(ID, RID, TS);
-    expect(svc.verifySignature(`ts=${TS},v1=${v1}`, 'otro-req', ID)).toBe(false);
+    expect(svc.verifySignature(`ts=${TS},v1=${v1}`, 'otro-req', ID)).toBe(
+      false,
+    );
   });
 
   it('rechaza una firma hecha con otro secreto', () => {
@@ -63,6 +72,8 @@ describe('MercadoPagoService.verifySignature', () => {
   it('rechaza todo si el servidor no tiene el secreto configurado', () => {
     const sinSecreto = conConfig(undefined);
     const v1 = firmar(ID, RID, TS);
-    expect(sinSecreto.verifySignature(`ts=${TS},v1=${v1}`, RID, ID)).toBe(false);
+    expect(sinSecreto.verifySignature(`ts=${TS},v1=${v1}`, RID, ID)).toBe(
+      false,
+    );
   });
 });

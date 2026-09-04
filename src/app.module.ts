@@ -23,6 +23,10 @@ import { ChangesModule } from './modules/changes/changes.module';
 import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { MercadoPagoModule } from './modules/mercadopago/mercadopago.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { MongooseModule as MongooseFeature } from '@nestjs/mongoose';
+import { ReadonlyInterceptor } from './common/interceptors/readonly.interceptor';
+import { Clinic, ClinicSchema } from './modules/clinics/schemas/clinic.schema';
 
 @Module({
   imports: [
@@ -63,8 +67,16 @@ import { MercadoPagoModule } from './modules/mercadopago/mercadopago.module';
     AdminAuthModule,
     AdminModule,
     MercadoPagoModule,
+    MongooseFeature.forFeature([{ name: Clinic.name, schema: ClinicSchema }]),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Global: cualquier escritura de un consultorio en mora se rechaza.
+    // Va como INTERCEPTOR y no como guard: los guards globales corren antes
+    // que los de controller, o sea antes del JwtAuthGuard, y ahí `req.user`
+    // todavía no existe — dejaba pasar todo. Los interceptores corren después.
+    { provide: APP_INTERCEPTOR, useClass: ReadonlyInterceptor },
+  ],
 })
 export class AppModule {}

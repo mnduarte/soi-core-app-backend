@@ -22,6 +22,10 @@ import {
 import { Banner, BannerDocument } from '../banners/schemas/banner.schema';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import {
+  Appointment,
+  AppointmentDocument,
+} from '../appointments/schemas/appointment.schema';
+import {
   AdminSettings,
   AdminSettingsDocument,
 } from './schemas/admin-settings.schema';
@@ -31,6 +35,12 @@ import {
   PaymentMethod,
 } from './schemas/clinic-payment.schema';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
+import {
+  subscriptionState,
+  trialEndFor,
+  trialMonthNumber,
+  TRIAL_MONTHS,
+} from '../../common/subscription.policy';
 import {
   PasswordResetRequest,
   PasswordResetRequestDocument,
@@ -87,6 +97,8 @@ export class AdminService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Banner.name) private bannerModel: Model<BannerDocument>,
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
+    @InjectModel(Appointment.name)
+    private appointmentModel: Model<AppointmentDocument>,
     @InjectModel(AdminSettings.name)
     private adminSettingsModel: Model<AdminSettingsDocument>,
     @InjectModel(ClinicPayment.name)
@@ -163,10 +175,41 @@ export class AdminService {
   // Clinic list / detail — enriched with patientsCount, lastLoginAt, payment
   // ---------------------------------------------------------------------------
 
+  /**
+   * Turnos cargados por cada clínica en los últimos 7 días.
+   *
+   * UN aggregate para toda la página, no una query por clínica: `enrichClinic`
+   * ya hace 3 por clínica y la lista las multiplica por N. Contesta la otra
+   * mitad de la pregunta: la presencia dice si están adentro, esto dice si
+   * están trabajando. Se puede tener la pestaña abierta todo el día y no haber
+   * cargado un turno en tres semanas — eso es un cliente que se está yendo, y
+   * una luz verde de "en línea" lo esconde.
+   */
+  private async usoReciente(
+    clinicIds: Types.ObjectId[],
+  ): Promise<Map<string, number>> {
+    const desde = new Date(Date.now() - 7 * MS_PER_DAY);
+    const rows = await this.appointmentModel.aggregate<{
+      _id: Types.ObjectId;
+      n: number;
+    }>([
+      {
+        $match: {
+          clinicId: { $in: clinicIds },
+          deletedAt: null,
+          createdAt: { $gte: desde },
+        },
+      },
+      { $group: { _id: '$clinicId', n: { $sum: 1 } } },
+    ]);
+    return new Map(rows.map((r) => [r._id.toString(), r.n]));
+  }
+
   private async enrichClinic(
     clinic: ClinicDocument,
     gracePeriodDays: number,
     planPriceMonthly: number,
+    uso?: Map<string, number>,
   ) {
     const clinicId = clinic._id;
     const [patientsCount, lastUser, owner] = await Promise.all([
@@ -209,6 +252,13 @@ export class AdminService {
       updatedAt: clinic.updatedAt,
       patientsCount,
       lastLoginAt: lastUser?.lastLoginAt ?? null,
+      // Presencia real (app abierta y a la vista), distinta del login. Ver
+      // `Clinic.lastSeenAt` y ChangesService.
+      lastSeenAt: clinic.lastSeenAt ?? null,
+      // Turnos cargados en los últimos 7 días. `undefined` cuando el llamador
+      // no pidió el uso; el front distingue "sin datos" de "cero actividad",
+      // que significan cosas muy distintas.
+      turnos7d: uso ? (uso.get(clinicId.toString()) ?? 0) : undefined,
       daysToDue,
       paymentStatus,
       activated,
@@ -218,6 +268,23 @@ export class AdminService {
       // que coincide con el global".
       planPriceMonthly: clinic.planPriceMonthly ?? null,
       effectivePrice: this.effectivePrice(clinic, planPriceMonthly),
+      // Qué está viviendo el consultorio AHORA: sale de la misma función que
+      // corta el acceso, no de un cálculo paralelo. Antes el backoffice decía
+      // "Vencido 33d" para cuentas que tenían acceso completo, porque contaba
+      // desde otra fecha que la que el sistema mira para restringir.
+      access: subscriptionState(clinic),
+      // Cómo viene la prueba: desde cuándo, por qué mes va y cuándo termina.
+      // Se calcula acá para que el backoffice no tenga que replicar la regla
+      // de "el mes del alta cuenta entero".
+      trial:
+        clinic.status === SubscriptionStatus.TRIAL
+          ? {
+              startedAt: clinic.createdAt,
+              month: trialMonthNumber(clinic.createdAt),
+              months: TRIAL_MONTHS,
+              endsAt: clinic.trialEndsAt ?? null,
+            }
+          : null,
       mpPreapprovalStatus: clinic.mpPreapprovalStatus ?? null,
       mpInitPoint: clinic.mpInitPoint ?? null,
       mpFirstChargeAt: clinic.mpFirstChargeAt ?? null,
@@ -237,12 +304,14 @@ export class AdminService {
         .exec(),
       this.clinicModel.countDocuments({ deletedAt: null }),
     ]);
+    const uso = await this.usoReciente(clinics.map((c) => c._id));
     const enriched = await Promise.all(
       clinics.map((c) =>
         this.enrichClinic(
           c,
           settings.gracePeriodDays,
           settings.planPriceMonthly,
+          uso,
         ),
       ),
     );
@@ -255,10 +324,12 @@ export class AdminService {
       .exec();
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
     const settings = await this.getSettings();
+    const uso = await this.usoReciente([clinic._id]);
     return this.enrichClinic(
       clinic,
       settings.gracePeriodDays,
       settings.planPriceMonthly,
+      uso,
     );
   }
 
@@ -304,10 +375,11 @@ export class AdminService {
       brandColor: dto.brandColor ?? '#2F54EB',
       logoStyle: dto.logoStyle ?? 'tooth',
       status: SubscriptionStatus.TRIAL,
-      // Configurable trial — moved to ACTIVE on first payment. After it
-      // expires the clinic flows through the same due-soon → overdue
-      // → grace-end states a paid subscription does.
-      trialEndsAt: new Date(Date.now() + settings.trialDays * MS_PER_DAY),
+      // Dos meses de prueba, contados por mes calendario y con el mes del alta
+      // entero: un alta del 15 de junio tiene junio y julio, y el primer cobro
+      // cae el 1 de agosto. Antes eran N dias corridos desde el alta, asi que
+      // cada consultorio vencia un dia distinto.
+      trialEndsAt: trialEndFor(new Date()),
     });
 
     // Synthetic email so the existing unique index `(clinicId, email)` keeps
@@ -443,11 +515,23 @@ export class AdminService {
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
     const settings = await this.getSettings();
 
-    const days = dto.days ?? DEFAULT_PAYMENT_DAYS;
-    // Pago renueva la suscripción desde hoy (no se acumula desde una fecha
-    // vencida — el dentista paga "el próximo mes" desde el momento del pago).
-    const periodFrom = new Date();
-    const periodTo = new Date(periodFrom.getTime() + days * MS_PER_DAY);
+    // El período arranca donde termina lo que YA tiene pago, no en el día de
+    // hoy. Si paga adelantado (o si se registra el pago dos veces por error),
+    // los meses se SUMAN en vez de pisarse: antes, registrar un pago un 2 de
+    // septiembre a alguien cubierto hasta el 21 lo dejaba hasta el 2 de
+    // octubre — le comía 19 días ya pagos.
+    const cubierto = clinic.subscriptionEndsAt;
+    const periodFrom =
+      cubierto && cubierto.getTime() > Date.now()
+        ? new Date(cubierto)
+        : new Date();
+
+    // En meses de calendario, no en bloques de 30 días: "pago hasta el 21 de
+    // octubre" es lo que el dentista entiende, y no se corre unos días por mes.
+    const meses = dto.months ?? 1;
+    const periodTo = new Date(periodFrom);
+    if (dto.days) periodTo.setTime(periodTo.getTime() + dto.days * MS_PER_DAY);
+    else periodTo.setMonth(periodTo.getMonth() + meses);
 
     // El pago queda ASENTADO, no solo corrida la fecha de vencimiento. Es lo
     // que después permite conciliar contra Mercado Pago y contestar "¿desde
@@ -455,7 +539,9 @@ export class AdminService {
     await this.clinicPaymentModel.create({
       clinicId: clinic._id,
       amount:
-        dto.amount ?? this.effectivePrice(clinic, settings.planPriceMonthly),
+        dto.amount ??
+        this.effectivePrice(clinic, settings.planPriceMonthly) *
+          (dto.months ?? 1),
       paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
       method: dto.method ?? PaymentMethod.TRANSFER,
       periodFrom,

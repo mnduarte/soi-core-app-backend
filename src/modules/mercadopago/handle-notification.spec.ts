@@ -27,7 +27,9 @@ describe('MercadoPagoService.handleNotification — cobro automático', () => {
       save: jest.fn().mockResolvedValue(undefined),
     };
     const clinicModel = {
-      findOne: jest.fn().mockReturnValue({ exec: () => Promise.resolve(clinic) }),
+      findOne: jest
+        .fn()
+        .mockReturnValue({ exec: () => Promise.resolve(clinic) }),
     };
     const creados: Record<string, unknown>[] = [];
     const paymentModel = {
@@ -39,7 +41,9 @@ describe('MercadoPagoService.handleNotification — cobro automático', () => {
     };
 
     const svc = new MercadoPagoService(
-      { get: (k: string) => (k === 'MP_ACCESS_TOKEN' ? 'tok' : undefined) } as unknown as ConfigService,
+      {
+        get: (k: string) => (k === 'MP_ACCESS_TOKEN' ? 'tok' : undefined),
+      } as unknown as ConfigService,
       clinicModel as never,
       paymentModel as never,
     );
@@ -88,7 +92,10 @@ describe('MercadoPagoService.handleNotification — cobro automático', () => {
     // MP reintenta cada 15 minutos hasta recibir 200, así que la misma
     // notificación llega repetida. El índice único sobre mpPaymentId hace que
     // el segundo intento explote con 11000, y eso NO es un error.
-    const { svc, clinic } = armar({ respuestaMp: cobroOk, creaFalla: { code: 11000 } });
+    const { svc, clinic } = armar({
+      respuestaMp: cobroOk,
+      creaFalla: { code: 11000 },
+    });
     await expect(
       svc.handleNotification('subscription_authorized_payment', '998877'),
     ).resolves.toBeUndefined();
@@ -106,7 +113,11 @@ describe('MercadoPagoService.handleNotification — cobro automático', () => {
 
   it('un cobro rechazado no suspende la cuenta: solo deja la marca', async () => {
     const { svc, clinic, paymentModel } = armar({
-      respuestaMp: { ...cobroOk, status: 'rejected', payment: { status: 'rejected' } },
+      respuestaMp: {
+        ...cobroOk,
+        status: 'rejected',
+        payment: { status: 'rejected' },
+      },
     });
     await svc.handleNotification('subscription_authorized_payment', '998877');
 

@@ -44,7 +44,9 @@ export class MercadoPagoController {
     if (!this.mp.verifySignature(signature, requestId, dataId)) {
       // Se responde 200 igual: un 4xx hace que MP reintente cada 15 minutos
       // durante días una notificación que nunca vamos a aceptar. Queda el log.
-      this.logger.warn(`Webhook con firma inválida (type=${type} id=${dataId})`);
+      this.logger.warn(
+        `Webhook con firma inválida (type=${type} id=${dataId})`,
+      );
       return { ok: true };
     }
 
@@ -53,7 +55,10 @@ export class MercadoPagoController {
     } catch (e) {
       // Acá SÍ conviene que reintente: fue un fallo nuestro (MP caído, base
       // fuera), no una notificación inválida. Se devuelve 500 para eso.
-      this.logger.error(`Error procesando webhook ${type}/${dataId}`, e as Error);
+      this.logger.error(
+        `Error procesando webhook ${type}/${dataId}`,
+        e as Error,
+      );
       throw e;
     }
     return { ok: true };

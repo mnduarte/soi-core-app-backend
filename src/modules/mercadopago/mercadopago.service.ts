@@ -23,13 +23,20 @@ const MP_API = 'https://api.mercadopago.com';
 
 /** Error de la API de MP con su código, para poder distinguir 404 de caída. */
 class MpHttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
 
 /** Estados que devuelve MP para una suscripción (preapproval). */
-export type PreapprovalStatus = 'pending' | 'authorized' | 'paused' | 'cancelled';
+export type PreapprovalStatus =
+  | 'pending'
+  | 'authorized'
+  | 'paused'
+  | 'cancelled';
 
 interface PreapprovalResponse {
   id: string;
@@ -85,8 +92,13 @@ export class MercadoPagoService {
     if (!res.ok) {
       // El cuerpo de MP trae el motivo real; sin loguearlo, depurar esto es
       // adivinar (los mensajes de error son bastante específicos).
-      this.logger.error(`MP ${init?.method ?? 'GET'} ${path} → ${res.status} ${text}`);
-      throw new MpHttpError(res.status, `Mercado Pago rechazó la operación (${res.status})`);
+      this.logger.error(
+        `MP ${init?.method ?? 'GET'} ${path} → ${res.status} ${text}`,
+      );
+      throw new MpHttpError(
+        res.status,
+        `Mercado Pago rechazó la operación (${res.status})`,
+      );
     }
     return (text ? JSON.parse(text) : {}) as T;
   }
@@ -150,7 +162,9 @@ export class MercadoPagoService {
       );
     }
     if (clinic.mpPreapprovalId && clinic.mpPreapprovalStatus !== 'cancelled') {
-      throw new BadRequestException('Este consultorio ya tiene una suscripción activa');
+      throw new BadRequestException(
+        'Este consultorio ya tiene una suscripción activa',
+      );
     }
 
     const startDate = this.firstChargeDate(clinic);
@@ -160,7 +174,9 @@ export class MercadoPagoService {
       // sin depender de guardar el id nosotros primero.
       external_reference: clinic._id.toString(),
       payer_email: clinic.contactEmail,
-      back_url: this.config.get<string>('MP_BACK_URL') ?? 'https://soi-odontologia-integral.vercel.app',
+      back_url:
+        this.config.get<string>('MP_BACK_URL') ??
+        'https://soi-odontologia-integral.vercel.app',
       status: 'pending',
       auto_recurring: {
         frequency: 1,
@@ -172,7 +188,10 @@ export class MercadoPagoService {
     };
 
     const pre = await this.mpCall(() =>
-      this.mpFetch<PreapprovalResponse>('/preapproval', { method: 'POST', body }),
+      this.mpFetch<PreapprovalResponse>('/preapproval', {
+        method: 'POST',
+        body,
+      }),
     );
 
     clinic.mpPreapprovalId = pre.id;
@@ -220,11 +239,16 @@ export class MercadoPagoService {
       throw new BadRequestException('Este consultorio no tiene suscripción');
     }
     const pre = await this.mpCall(() =>
-      this.mpFetch<PreapprovalResponse>(`/preapproval/${clinic.mpPreapprovalId}`),
+      this.mpFetch<PreapprovalResponse>(
+        `/preapproval/${clinic.mpPreapprovalId}`,
+      ),
     );
     clinic.mpPreapprovalStatus = pre.status;
     await clinic.save();
-    return { status: pre.status, nextPaymentDate: pre.next_payment_date ?? null };
+    return {
+      status: pre.status,
+      nextPaymentDate: pre.next_payment_date ?? null,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -245,7 +269,9 @@ export class MercadoPagoService {
   ): boolean {
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
     if (!secret) {
-      this.logger.error('MP_WEBHOOK_SECRET sin configurar: se rechaza la notificación');
+      this.logger.error(
+        'MP_WEBHOOK_SECRET sin configurar: se rechaza la notificación',
+      );
       return false;
     }
     if (!signature || !dataId) return false;
@@ -260,7 +286,9 @@ export class MercadoPagoService {
 
     // Los ids alfanuméricos van en minúscula según la doc de MP.
     const manifest = `id:${dataId.toLowerCase()};request-id:${requestId ?? ''};ts:${parts.ts};`;
-    const expected = createHmac('sha256', secret).update(manifest).digest('hex');
+    const expected = createHmac('sha256', secret)
+      .update(manifest)
+      .digest('hex');
 
     const a = Buffer.from(expected, 'utf8');
     const b = Buffer.from(parts.v1, 'utf8');
@@ -280,7 +308,8 @@ export class MercadoPagoService {
     // Un 404 de MP es definitivo: el recurso no existe y no va a existir. Si lo
     // dejáramos propagar, el controller devuelve 500 y MP reintenta cada 15
     // minutos durante días una notificación que nunca vamos a poder procesar.
-    const noExiste = (e: unknown) => e instanceof MpHttpError && e.status === 404;
+    const noExiste = (e: unknown) =>
+      e instanceof MpHttpError && e.status === 404;
 
     if (type === 'subscription_preapproval') {
       let pre: PreapprovalResponse;
@@ -322,11 +351,14 @@ export class MercadoPagoService {
         .findOne({ mpPreapprovalId: ap.preapproval_id, deletedAt: null })
         .exec();
       if (!clinic) {
-        this.logger.warn(`Cobro ${dataId} sin consultorio asociado (${ap.preapproval_id})`);
+        this.logger.warn(
+          `Cobro ${dataId} sin consultorio asociado (${ap.preapproval_id})`,
+        );
         return;
       }
 
-      const cobrado = ap.status === 'processed' || ap.payment?.status === 'approved';
+      const cobrado =
+        ap.status === 'processed' || ap.payment?.status === 'approved';
       if (!cobrado) {
         // No se suspende automáticamente: MP reintenta unos días, y cortarle
         // el sistema al Dr. por un rechazo transitorio es peor que esperar.
@@ -357,7 +389,9 @@ export class MercadoPagoService {
         // 11000 = duplicado: ya lo habíamos asentado en un reintento anterior.
         // No es un error, es exactamente lo que el índice tiene que hacer.
         if ((e as { code?: number }).code === 11000) {
-          this.logger.log(`Cobro ${ap.id} ya registrado, se ignora el reintento`);
+          this.logger.log(
+            `Cobro ${ap.id} ya registrado, se ignora el reintento`,
+          );
           return;
         }
         throw e;

@@ -10,6 +10,10 @@ export interface JwtPayload {
   // when this device's session was evicted (device cap / logout). Optional for
   // backwards compatibility with tokens issued before it existed.
   sid?: string;
+  // Sesión de soporte (el backoffice entró como este consultorio). El token lo
+  // trae desde siempre; recién ahora se declara porque hay lógica que necesita
+  // NO contar al operador como si fuera el cliente.
+  imp?: boolean;
 }
 
 export const CurrentUser = createParamDecorator(
