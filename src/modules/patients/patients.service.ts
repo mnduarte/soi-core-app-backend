@@ -196,6 +196,9 @@ export class PatientsService {
       return {
         ...p.toObject(),
         lastVisitAt: v?.lastVisitAt ?? null,
+        // Si no hay ninguno por venir, vale el último de hoy (ver el $group).
+        nextVisitAt: v?.nextVisitAt ?? v?.hoyUltimo ?? null,
+        nextCount: v?.nextCount ?? 0,
         appointmentsCount: v?.count ?? 0,
         balance: realizado - pagado,
       };
@@ -214,6 +217,13 @@ export class PatientsService {
   private async listStats(clinicId: string) {
     const cid = new Types.ObjectId(clinicId);
     const now = new Date();
+    // El "próximo turno" se mide contra el COMIENZO DEL DÍA, no contra la hora
+    // exacta. Con `now`, un turno de hoy a las 12:00 desaparecía a las 12:01 y
+    // el paciente pasaba a figurar con turno "mañana": si llama a esa hora
+    // preguntando cuándo tiene que venir, la respuesta correcta es "hoy a las
+    // 12", no la de la semana que viene. Un turno de hoy sigue siendo el
+    // próximo hasta que el día termina.
+    const hoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     const [visits, done, paid] = await Promise.all([
       // Turnos: total + fecha del último ya ocurrido (excluye cancelados).
@@ -235,6 +245,40 @@ export class PatientsService {
                 $max: {
                   $cond: [{ $lte: ['$startsAt', now] }, '$startsAt', null],
                 },
+              },
+              // El espejo del anterior: el turno futuro más cercano. Sale del
+              // mismo $group, así que no agrega ni una consulta. `$min` ignora
+              // los null, igual que `$max` acá arriba, así que los turnos ya
+              // pasados no compiten.
+              // El próximo de verdad: el más cercano que todavía no empezó.
+              nextVisitAt: {
+                $min: {
+                  $cond: [{ $gt: ['$startsAt', now] }, '$startsAt', null],
+                },
+              },
+              // Y si hoy ya pasaron todos, el último de hoy. Sirve de respaldo:
+              // a las 12:09, alguien con turno hoy a las 12:00 tiene que seguir
+              // apareciendo con ese turno —"hoy a las 12"— y no saltar a la
+              // semana que viene ni desaparecer de la lista.
+              hoyUltimo: {
+                $max: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $gte: ['$startsAt', hoy] },
+                        { $lte: ['$startsAt', now] },
+                      ],
+                    },
+                    '$startsAt',
+                    null,
+                  ],
+                },
+              },
+              // Cuántos futuros tiene en total. La columna muestra el más
+              // cercano, pero un paciente puede tener varios agendados y sin
+              // esto la lista afirmaría que tiene uno solo.
+              nextCount: {
+                $sum: { $cond: [{ $gte: ['$startsAt', hoy] }, 1, 0] },
               },
             },
           },
@@ -264,7 +308,14 @@ export class PatientsService {
     return {
       visits: new Map(
         (
-          visits as { _id: unknown; count: number; lastVisitAt: Date | null }[]
+          visits as {
+            _id: unknown;
+            count: number;
+            lastVisitAt: Date | null;
+            nextVisitAt: Date | null;
+            hoyUltimo: Date | null;
+            nextCount: number;
+          }[]
         ).map((r) => [String(r._id), r]),
       ),
       done: totalsById(done as { _id: unknown; total: number }[]),
