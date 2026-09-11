@@ -36,6 +36,7 @@ import {
 } from './schemas/clinic-payment.schema';
 import { MercadoPagoService } from '../mercadopago/mercadopago.service';
 import {
+  paidPeriod,
   subscriptionState,
   trialEndFor,
   trialMonthNumber,
@@ -515,23 +516,16 @@ export class AdminService {
     if (!clinic) throw new NotFoundException('Clínica no encontrada');
     const settings = await this.getSettings();
 
-    // El período arranca donde termina lo que YA tiene pago, no en el día de
-    // hoy. Si paga adelantado (o si se registra el pago dos veces por error),
-    // los meses se SUMAN en vez de pisarse: antes, registrar un pago un 2 de
-    // septiembre a alguien cubierto hasta el 21 lo dejaba hasta el 2 de
-    // octubre — le comía 19 días ya pagos.
-    const cubierto = clinic.subscriptionEndsAt;
-    const periodFrom =
-      cubierto && cubierto.getTime() > Date.now()
-        ? new Date(cubierto)
-        : new Date();
-
-    // En meses de calendario, no en bloques de 30 días: "pago hasta el 21 de
-    // octubre" es lo que el dentista entiende, y no se corre unos días por mes.
+    // La regla vive en `subscription.policy`, con el resto de la política de
+    // suscripción y sus tests. Acá solo se aplica.
     const meses = dto.months ?? 1;
-    const periodTo = new Date(periodFrom);
-    if (dto.days) periodTo.setTime(periodTo.getTime() + dto.days * MS_PER_DAY);
-    else periodTo.setMonth(periodTo.getMonth() + meses);
+    const cubierto = clinic.subscriptionEndsAt ?? clinic.trialEndsAt;
+    const { from: periodFrom, to: porMeses } = paidPeriod(cubierto, meses);
+    // Ajuste manual en días (prórrogas puntuales): no se normaliza al día 1,
+    // justamente porque es una excepción a mano.
+    const periodTo = dto.days
+      ? new Date(periodFrom.getTime() + dto.days * MS_PER_DAY)
+      : porMeses;
 
     // El pago queda ASENTADO, no solo corrida la fecha de vencimiento. Es lo
     // que después permite conciliar contra Mercado Pago y contestar "¿desde

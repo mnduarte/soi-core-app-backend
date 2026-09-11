@@ -145,3 +145,39 @@ export function isReadonly(clinic: Clinic): boolean {
 export function isFullyBlocked(clinic: Clinic): boolean {
   return subscriptionState(clinic).level === 'blocked';
 }
+
+/**
+ * Qué período cubre un pago que se registra hoy.
+ *
+ * Un pago compra MESES DE CALENDARIO y la cobertura siempre termina el día 1.
+ * Es el modelo con el que piensa el consultorio: "pagó septiembre" = trabaja
+ * todo septiembre, y el 1 de octubre vuelve a empezar el ciclo. Y es el que ya
+ * asumía el resto del sistema —la prueba termina el día 1, el débito
+ * automático cobra el 1—, pero el registro de pagos no lo respetaba: sumaba un
+ * mes desde donde estuviera parada la fecha, así que bastaba un ajuste manual
+ * para que el vencimiento se saliera del día 1 y no volviera nunca. Un
+ * consultorio con vencimiento el 19 pagaba "septiembre" y el 22 ya tenía el
+ * primer aviso.
+ *
+ * @param cubierto  hasta cuándo ya está paga la cuenta (o el fin de la prueba,
+ *                  si todavía no pagó nunca). Si quedó en el pasado se arranca
+ *                  el 1 de este mes: se está pagando ESTE mes.
+ * @param meses     cuántos meses se pagan de una.
+ */
+export function paidPeriod(
+  cubierto: Date | null | undefined,
+  meses = 1,
+  now = new Date(),
+): { from: Date; to: Date } {
+  const inicioDeMes = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Arranca donde termina lo ya cubierto, no hoy: el que paga adelantado suma
+  // en vez de perder días, y registrar dos veces por error no le come lo pago.
+  const from =
+    cubierto && cubierto.getTime() > inicioDeMes.getTime()
+      ? new Date(cubierto)
+      : inicioDeMes;
+  return {
+    from,
+    to: new Date(from.getFullYear(), from.getMonth() + meses, 1),
+  };
+}
