@@ -6,7 +6,15 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 // Local dev defaults — overridden in production by the FRONTEND_URLS env var.
-const DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174'];
+// 4173 is `vite preview`: the production build served locally. It belongs here
+// because some things only show up in that build — dev mode adds per-element
+// validation that makes rendering several times slower, so "is this slow or is
+// it the dev tooling?" can only be answered against the real build.
+const DEV_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:4173',
+];
 
 function parseAllowedOrigins(): string[] {
   // Comma-separated list (e.g.
