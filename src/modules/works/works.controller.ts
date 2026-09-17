@@ -12,6 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ClinicalGuard } from '../../common/guards/clinical.guard';
 import {
   CurrentUser,
   type JwtPayload,
@@ -21,7 +22,8 @@ import { WorksService } from './works.service';
 import { CreateWorkDto, UpdateWorkDto } from './dto/work.dto';
 
 @Controller('works')
-@UseGuards(JwtAuthGuard)
+// Todo lo de este controller es clínico: el Asistente no entra (ver ClinicalGuard).
+@UseGuards(JwtAuthGuard, ClinicalGuard)
 export class WorksController {
   constructor(private readonly worksService: WorksService) {}
 

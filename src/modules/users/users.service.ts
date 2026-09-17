@@ -41,14 +41,44 @@ export class UsersService {
     dto: UpdateUserDto,
     requester: JwtPayload,
   ) {
-    const user = await this.findById(clinicId, userId);
+    const esTitular = (requester.role as UserRole) === UserRole.OWNER;
 
-    // Only OWNER can change roles
-    if (dto.role !== undefined && requester.role !== UserRole.OWNER) {
-      throw new ForbiddenException('Solo el propietario puede cambiar roles');
+    // Un miembro solo se edita a sí mismo. Antes podía editar a cualquiera del
+    // consultorio, titular incluido.
+    if (!esTitular && requester.sub !== userId) {
+      throw new ForbiddenException(
+        'Solo el titular puede editar a otros usuarios',
+      );
+    }
+    // Y no puede tocar lo que define qué ve. `isClinical` es la llave de la
+    // ficha clínica (ver ClinicalGuard): si un Asistente pudiera ponérsela en
+    // true, la restricción entera sería decorativa.
+    if (
+      !esTitular &&
+      (dto.role !== undefined || dto.isClinical !== undefined)
+    ) {
+      throw new ForbiddenException(
+        'Solo el titular puede cambiar el tipo de usuario',
+      );
     }
 
-    Object.assign(user, dto);
+    const user = await this.findById(clinicId, userId);
+
+    // Campo por campo, nunca Object.assign con el DTO: con transform:true las
+    // opcionales llegan como `undefined` y pisan lo guardado (ver CLAUDE.md).
+    if (dto.name !== undefined) user.name = dto.name;
+    if (dto.role !== undefined) user.role = dto.role;
+    if (dto.isClinical !== undefined) user.isClinical = dto.isClinical;
+    if (dto.clinicalProfile !== undefined) {
+      const actual = user.clinicalProfile ?? {};
+      const cp = dto.clinicalProfile;
+      user.clinicalProfile = {
+        ...actual,
+        ...(cp.license !== undefined && { license: cp.license }),
+        ...(cp.specialty !== undefined && { specialty: cp.specialty }),
+        ...(cp.agendaColor !== undefined && { agendaColor: cp.agendaColor }),
+      };
+    }
     user.updatedAt = new Date();
     user.updatedBy = new Types.ObjectId(requester.sub);
     return user.save();
