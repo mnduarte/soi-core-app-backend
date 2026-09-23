@@ -200,6 +200,7 @@ export class PatientsService {
         nextVisitAt: v?.nextVisitAt ?? v?.hoyUltimo ?? null,
         nextCount: v?.nextCount ?? 0,
         appointmentsCount: v?.count ?? 0,
+        faltas: v?.faltas ?? 0,
         balance: realizado - pagado,
       };
     });
@@ -280,6 +281,14 @@ export class PatientsService {
               nextCount: {
                 $sum: { $cond: [{ $gte: ['$startsAt', hoy] }, 1, 0] },
               },
+              // Turnos a los que el paciente no vino. Es el ÚNICO dato de
+              // asistencia que se registra bien: "no asistió" se marca porque
+              // duele, "atendido" casi nunca (0,4 de 2,2 turnos por paciente en
+              // datos reales), así que contar atendidos daría un número que
+              // miente. Sale del mismo $group: no cuesta una consulta más.
+              faltas: {
+                $sum: { $cond: [{ $eq: ['$status', 'NO_SHOW'] }, 1, 0] },
+              },
             },
           },
         ])
@@ -315,6 +324,7 @@ export class PatientsService {
             nextVisitAt: Date | null;
             hoyUltimo: Date | null;
             nextCount: number;
+            faltas: number;
           }[]
         ).map((r) => [String(r._id), r]),
       ),
