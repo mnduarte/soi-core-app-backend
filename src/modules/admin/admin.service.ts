@@ -222,7 +222,7 @@ export class AdminService {
         .exec(),
       this.userModel
         .findOne({ clinicId, role: UserRole.OWNER, deletedAt: null })
-        .select('mustChangePassword')
+        .select('mustChangePassword username')
         .exec(),
     ]);
     const daysToDue = this.computeDaysToDue(clinic);
@@ -244,6 +244,10 @@ export class AdminService {
       city: clinic.city,
       phone: clinic.phone,
       contactEmail: clinic.contactEmail,
+      // El usuario del titular: es lo que llega en las consultas por WhatsApp
+      // que manda la app, y con eso se encuentra la cuenta sin ambigüedad.
+      // No cuesta una consulta más — el titular ya se busca acá arriba.
+      ownerUsername: owner?.username ?? null,
       status: clinic.status,
       brandColor: clinic.brandColor,
       logoStyle: clinic.logoStyle,
