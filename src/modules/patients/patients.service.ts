@@ -8,6 +8,7 @@ import { ScanFichaDto } from './dto/scan-ficha.dto';
 import { QuickCreatePatientDto } from './dto/quick-create-patient.dto';
 import { FichaScanService } from './ficha-scan.service';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
+import { regexSinAcentos } from '../../common/busqueda';
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -164,9 +165,12 @@ export class PatientsService {
       // Búsqueda parcial (substring) por cada palabra: cada término tiene que
       // matchear al menos un campo. Así "luc" encuentra "Lucia" y "lucia fer"
       // encuentra "Lucia Fernandes". ($text solo matchea palabras completas.)
-      const tokens = search.trim().split(/\s+/).map(escapeRegex);
+      // Sin acentos: "luci" encuentra a Lucía y "benavidez" a Benavídez. Se
+      // escribe con el paciente enfrente y una tilde de menos dejaba la lista
+      // vacía. Ver `regexSinAcentos`.
+      const tokens = search.trim().split(/\s+/);
       filter.$and = tokens.map((tok) => {
-        const rx = new RegExp(tok, 'i');
+        const rx = regexSinAcentos(tok);
         return {
           $or: [
             { name: rx },
