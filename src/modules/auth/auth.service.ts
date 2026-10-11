@@ -386,6 +386,25 @@ export class AuthService {
   // Lightweight poll target. The core-app calls this every ~30s so suspension
   // and session eviction take effect quickly without per-request cost or
   // WebSockets. Returns ok:false + a reason the client maps to a message.
+  /**
+   * Confirma que quien está del otro lado de la pantalla es el profesional y
+   * no el paciente que tiene la tablet en la mano.
+   *
+   * Se usa para salir del modo firma sin firmar. No emite tokens ni toca nada:
+   * solo responde sí o no. Deliberadamente no distingue "usuario no existe" de
+   * "contraseña incorrecta" — con la sesión ya abierta el usuario existe, y
+   * cualquier matiz extra solo le sirve a quien está probando.
+   */
+  async verifyPassword(requester: JwtPayload, password: string) {
+    const user = await this.userModel
+      .findOne({ _id: new Types.ObjectId(requester.sub), deletedAt: null })
+      .exec();
+    if (!user) throw new UnauthorizedException('No se pudo verificar');
+    const valid = await argon2.verify(user.passwordHash, password);
+    if (!valid) throw new UnauthorizedException('Contraseña incorrecta');
+    return { ok: true };
+  }
+
   async sessionStatus(user: JwtPayload): Promise<{
     ok: boolean;
     reason?: 'SUSPENDED' | 'EXPIRED' | 'SESSION_REPLACED' | 'BLOCKED';

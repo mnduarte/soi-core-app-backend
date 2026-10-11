@@ -16,6 +16,13 @@ import { SetupPasswordDto } from './dto/setup-password.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { IsString, MinLength } from 'class-validator';
+
+class VerifyPasswordDto {
+  @IsString()
+  @MinLength(1)
+  password: string;
+}
 import {
   CurrentUser,
   type JwtPayload,
@@ -77,6 +84,18 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   sessionStatus(@CurrentUser() user: JwtPayload) {
     return this.authService.sessionStatus(user);
+  }
+
+  // Confirmar la identidad del profesional para destrabar la pantalla de
+  // firma. No emite tokens: solo responde sí o no.
+  @Post('verify-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  verifyPassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: VerifyPasswordDto,
+  ) {
+    return this.authService.verifyPassword(user, dto.password);
   }
 
   @Post('accept-invitation')
