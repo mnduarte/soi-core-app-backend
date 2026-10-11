@@ -84,6 +84,9 @@ export class GalleryService {
       treatmentItemId: dto.treatmentItemId
         ? new Types.ObjectId(dto.treatmentItemId)
         : undefined,
+      clinicalEntryId: dto.clinicalEntryId
+        ? new Types.ObjectId(dto.clinicalEntryId)
+        : undefined,
       toothNumber: dto.toothNumber,
       uploadedAt: new Date(),
       uploadedBy: new Types.ObjectId(requester.sub),
@@ -125,6 +128,10 @@ export class GalleryService {
     if (dto.treatmentItemId !== undefined)
       photo.treatmentItemId = dto.treatmentItemId
         ? new Types.ObjectId(dto.treatmentItemId)
+        : undefined;
+    if (dto.clinicalEntryId !== undefined)
+      photo.clinicalEntryId = dto.clinicalEntryId
+        ? new Types.ObjectId(dto.clinicalEntryId)
         : undefined;
     if (dto.toothNumber !== undefined) photo.toothNumber = dto.toothNumber;
     session.updatedBy = new Types.ObjectId(requester.sub);

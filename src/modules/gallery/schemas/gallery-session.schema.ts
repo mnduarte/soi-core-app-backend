@@ -46,6 +46,13 @@ export class GalleryPhoto {
   @Prop({ type: Types.ObjectId })
   treatmentItemId?: Types.ObjectId;
 
+  // Entrada de evolución que esta foto documenta. Mismo patrón que el vínculo
+  // al trabajo: una nota clínica ("Rx periapical de 36") y la imagen que la
+  // respalda tienen que poder mirarse juntas. Opcional — la mayoría de las
+  // fotos no cuelgan de ninguna nota.
+  @Prop({ type: Types.ObjectId, ref: 'ClinicalEntry' })
+  clinicalEntryId?: Types.ObjectId;
+
   @Prop()
   toothNumber?: number;
 

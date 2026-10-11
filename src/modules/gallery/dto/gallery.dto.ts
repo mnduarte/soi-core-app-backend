@@ -43,6 +43,11 @@ export class AddPhotoDto {
   @IsMongoId()
   treatmentItemId?: string;
 
+  // Vínculo opcional a una entrada de evolución.
+  @IsOptional()
+  @IsMongoId()
+  clinicalEntryId?: string;
+
   @IsOptional()
   @IsNumber()
   toothNumber?: number;
@@ -80,6 +85,11 @@ export class UpdatePhotoDto {
   @IsOptional()
   @IsString()
   treatmentItemId?: string;
+
+  // Ídem para la entrada de evolución: '' desvincula.
+  @IsOptional()
+  @IsString()
+  clinicalEntryId?: string;
 
   @IsOptional()
   @IsNumber()
