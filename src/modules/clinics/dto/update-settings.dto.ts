@@ -6,10 +6,55 @@ import {
   IsArray,
   ValidateNested,
   Matches,
+  MaxLength,
   Min,
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class ConsentTemplateVersionDto {
+  @IsString()
+  @MaxLength(60)
+  id: string;
+
+  @IsNumber()
+  n: number;
+
+  @IsString()
+  @MaxLength(20000)
+  body: string;
+
+  @IsString()
+  createdAt: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  createdByName?: string;
+}
+
+export class ConsentTemplateDto {
+  @IsString()
+  @MaxLength(60)
+  id: string;
+
+  @IsString()
+  @MaxLength(120)
+  name: string;
+
+  @IsOptional()
+  @IsBoolean()
+  required?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConsentTemplateVersionDto)
+  versions: ConsentTemplateVersionDto[];
+}
 
 export class WorkingHourDto {
   @IsNumber()
@@ -66,4 +111,10 @@ export class UpdateSettingsDto {
   @IsArray()
   @IsString({ each: true })
   photoCategories?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConsentTemplateDto)
+  consentTemplates?: ConsentTemplateDto[];
 }

@@ -13,6 +13,7 @@ import { OdontogramsModule } from './modules/odontograms/odontograms.module';
 import { TreatmentPlansModule } from './modules/treatment-plans/treatment-plans.module';
 import { WorksModule } from './modules/works/works.module';
 import { ClinicalEntriesModule } from './modules/clinical-entries/clinical-entries.module';
+import { ConsentsModule } from './modules/consents/consents.module';
 import { PriceCatalogModule } from './modules/price-catalog/price-catalog.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { DayNotesModule } from './modules/day-notes/day-notes.module';
@@ -57,6 +58,7 @@ import { Clinic, ClinicSchema } from './modules/clinics/schemas/clinic.schema';
     TreatmentPlansModule,
     WorksModule,
     ClinicalEntriesModule,
+    ConsentsModule,
     PriceCatalogModule,
     AppointmentsModule,
     DayNotesModule,

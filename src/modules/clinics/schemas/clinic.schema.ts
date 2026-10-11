@@ -21,6 +21,58 @@ export class WorkingHour {
   end: string; // "18:00"
 }
 
+/**
+ * Una versión del texto de una plantilla. Nunca se edita: cada "Guardar"
+ * agrega una nueva.
+ *
+ * Importa para el respaldo legal. El consentimiento firmado ya congela su
+ * propio `finalText`, así que saber QUÉ firmó el paciente está cubierto; lo
+ * que agrega la versión es saber DE DÓNDE salió ese texto, y poder mostrar
+ * que el día que se firmó la plantilla decía exactamente eso.
+ */
+export class ConsentTemplateVersion {
+  @Prop({ required: true })
+  id: string;
+
+  /** 1, 2, 3… Es lo que se muestra como "v3". */
+  @Prop({ required: true })
+  n: number;
+
+  @Prop({ required: true })
+  body: string;
+
+  @Prop({ required: true })
+  createdAt: Date;
+
+  /** Nombre de quien la guardó, congelado: si después se va del consultorio,
+   *  el pie de la plantilla tiene que seguir diciendo quién la escribió. */
+  @Prop()
+  createdByName?: string;
+}
+
+/** Plantilla de consentimiento informado del consultorio. El cuerpo admite
+ *  {{paciente}}, {{dni}}, {{profesional}}, {{trabajo}} y {{fecha}}. */
+export class ConsentTemplate {
+  @Prop({ required: true })
+  id: string;
+
+  @Prop({ required: true })
+  name: string;
+
+  /** Hay que firmarla antes de hacer el trabajo. Alimenta el aviso
+   *  "⚠ sin consentimiento" en la hoja de trabajos. */
+  @Prop({ default: false })
+  required: boolean;
+
+  /** Archivada: desaparece de los selects pero no se borra, porque hay
+   *  consentimientos firmados que la referencian. */
+  @Prop({ default: false })
+  archived: boolean;
+
+  @Prop({ type: [Object], default: [] })
+  versions: ConsentTemplateVersion[];
+}
+
 export class ClinicSettings {
   @Prop({ default: 'America/Argentina/Buenos_Aires' })
   timezone: string;
@@ -54,6 +106,13 @@ export class ClinicSettings {
   // Vacío → el front usa los defaults (Intraoral / Extraoral / Radiografía).
   @Prop({ type: [String], default: [] })
   photoCategories: string[];
+
+  // Plantillas de consentimiento informado, personalizables por consultorio.
+  // Vacío → el front ofrece la plantilla de ejemplo que viene en el código,
+  // igual que con los trabajos rápidos y las categorías de fotos. Así un
+  // consultorio nuevo ya tiene algo que mostrar el primer día.
+  @Prop({ type: [Object], default: [] })
+  consentTemplates: ConsentTemplate[];
 
   @Prop()
   logoUrl?: string;
