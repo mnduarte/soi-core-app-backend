@@ -67,6 +67,27 @@ export class ClinicsService {
         .filter(Boolean)
         .slice(0, 20);
 
+    if (dto.consentTemplates !== undefined)
+      settings.consentTemplates = dto.consentTemplates
+        .filter((p) => p.name?.trim() && p.versions?.length)
+        .slice(0, 40)
+        .map((p) => ({
+          id: p.id,
+          name: p.name.trim(),
+          required: p.required ?? false,
+          archived: p.archived ?? false,
+          versions: p.versions.map((v) => ({
+            id: v.id,
+            n: v.n,
+            body: v.body,
+            createdAt: new Date(v.createdAt),
+            createdByName: v.createdByName,
+          })),
+        }));
+
+    if (dto.features !== undefined)
+      settings.features = { ...settings.features, ...dto.features };
+
     clinic.settings = settings;
     clinic.updatedAt = new Date();
     clinic.markModified('settings');

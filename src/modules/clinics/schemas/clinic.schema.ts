@@ -73,6 +73,16 @@ export class ConsentTemplate {
   versions: ConsentTemplateVersion[];
 }
 
+/** Features que se encienden consultorio por consultorio. Sirve para probar
+ *  algo con un consultorio de prueba sin que aparezca en los productivos. */
+export class ClinicFeatures {
+  @Prop({ default: false })
+  evolucion?: boolean;
+
+  @Prop({ default: false })
+  consentimientos?: boolean;
+}
+
 export class ClinicSettings {
   @Prop({ default: 'America/Argentina/Buenos_Aires' })
   timezone: string;
@@ -113,6 +123,11 @@ export class ClinicSettings {
   // consultorio nuevo ya tiene algo que mostrar el primer día.
   @Prop({ type: [Object], default: [] })
   consentTemplates: ConsentTemplate[];
+
+  // Apagadas por defecto: una feature nueva no aparece sola en un
+  // consultorio que atiende pacientes reales.
+  @Prop({ type: Object, default: () => ({}) })
+  features: ClinicFeatures;
 
   @Prop()
   logoUrl?: string;

@@ -12,6 +12,16 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class ClinicFeaturesDto {
+  @IsOptional()
+  @IsBoolean()
+  evolucion?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  consentimientos?: boolean;
+}
+
 export class ConsentTemplateVersionDto {
   @IsString()
   @MaxLength(60)
@@ -117,4 +127,9 @@ export class UpdateSettingsDto {
   @ValidateNested({ each: true })
   @Type(() => ConsentTemplateDto)
   consentTemplates?: ConsentTemplateDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ClinicFeaturesDto)
+  features?: ClinicFeaturesDto;
 }

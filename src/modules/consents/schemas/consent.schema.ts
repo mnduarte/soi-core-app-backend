@@ -79,6 +79,26 @@ export class Consent extends BaseEntity {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   professionalId?: Types.ObjectId;
 
+  /**
+   * Identidad y firma del profesional, CONGELADAS al firmar.
+   *
+   * No se leen del usuario al mostrar el consentimiento: si mañana se cambia
+   * la matrícula o se rehace la firma en el perfil, un documento ya firmado
+   * tiene que seguir mostrando lo que mostraba ese día. Es la misma razón por
+   * la que el texto se congela en vez de referenciar la plantilla.
+   */
+  @Prop()
+  professionalName?: string;
+
+  @Prop()
+  professionalLicense?: string;
+
+  @Prop()
+  professionalDni?: string;
+
+  @Prop()
+  professionalSignaturePng?: string;
+
   @Prop()
   signedAt?: Date;
 

@@ -13,6 +13,7 @@ import {
   ConsentStatus,
 } from './schemas/consent.schema';
 import { Work, WorkDocument } from '../works/schemas/work.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateConsentDto, SignConsentDto } from './dto/consent.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
@@ -23,6 +24,8 @@ export class ConsentsService {
     private consentModel: Model<ConsentDocument>,
     @InjectModel(Work.name)
     private workModel: Model<WorkDocument>,
+    @InjectModel(User.name)
+    private userModel: Model<UserDocument>,
   ) {}
 
   async create(
@@ -117,6 +120,21 @@ export class ConsentsService {
 
     const signedAt = new Date();
     const dni = dto.dni ?? consent.dni ?? '';
+
+    // La identidad y la firma del profesional se COPIAN acá, no se leen del
+    // usuario cada vez que se muestra el consentimiento: si mañana cambia su
+    // matrícula o rehace su firma, lo ya firmado tiene que seguir igual.
+    const prof = consent.professionalId
+      ? await this.userModel
+          .findOne({ _id: consent.professionalId, deletedAt: null })
+          .exec()
+      : null;
+    if (prof) {
+      consent.professionalName = prof.name;
+      consent.professionalLicense = prof.clinicalProfile?.license;
+      consent.professionalDni = prof.clinicalProfile?.dni;
+      consent.professionalSignaturePng = prof.clinicalProfile?.signaturePng;
+    }
 
     consent.signaturePng = dto.signaturePng;
     consent.dni = dni || undefined;

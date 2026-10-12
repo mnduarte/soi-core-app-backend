@@ -18,8 +18,20 @@ export enum UserTitle {
 }
 
 export class ClinicalProfile {
+  /** Matrícula profesional. */
   @Prop()
   license?: string;
+
+  /** Documento del profesional. Va acá y no en el usuario porque solo
+   *  importa para la documentación clínica que lo identifica. */
+  @Prop()
+  dni?: string;
+
+  /** Firma del profesional en data URI, dibujada una sola vez en el perfil.
+   *  Se estampa en los consentimientos: un consentimiento informado lo firman
+   *  los dos, no solo el paciente. */
+  @Prop()
+  signaturePng?: string;
 
   @Prop()
   specialty?: string;
