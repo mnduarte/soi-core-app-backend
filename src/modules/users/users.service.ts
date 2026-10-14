@@ -72,9 +72,14 @@ export class UsersService {
     if (dto.clinicalProfile !== undefined) {
       const actual = user.clinicalProfile ?? {};
       const cp = dto.clinicalProfile;
+      // Campo por campo, nunca `...cp`: con `transform: true` el DTO llega
+      // como instancia con TODAS las opcionales presentes en `undefined`, y el
+      // spread pisaría con `undefined` lo que ya estaba guardado.
       user.clinicalProfile = {
         ...actual,
         ...(cp.license !== undefined && { license: cp.license }),
+        ...(cp.dni !== undefined && { dni: cp.dni }),
+        ...(cp.signaturePng !== undefined && { signaturePng: cp.signaturePng }),
         ...(cp.specialty !== undefined && { specialty: cp.specialty }),
         ...(cp.agendaColor !== undefined && { agendaColor: cp.agendaColor }),
       };
