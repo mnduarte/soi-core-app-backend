@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   UseGuards,
@@ -16,6 +18,8 @@ import {
 import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { ConsentsService } from './consents.service';
 import { CreateConsentDto, SignConsentDto } from './dto/consent.dto';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { AnnulConsentDto } from './dto/annul-consent.dto';
 
 @Controller('patients/:patientId/consents')
 // Consentimiento informado es documentación clínica: el Asistente no entra.
@@ -55,6 +59,18 @@ export class ConsentsController {
     return this.consentsService.findOne(clinicId, patientId, id);
   }
 
+  // Genera el link de un solo uso. Devuelve el token en claro UNA vez: en la
+  // base queda solo su hash.
+  @Post(':id/link')
+  @HttpCode(HttpStatus.OK)
+  crearLink(
+    @ClinicId() clinicId: string,
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+  ) {
+    return this.consentsService.crearLink(clinicId, patientId, id);
+  }
+
   @Post(':id/sign')
   sign(
     @ClinicId() clinicId: string,
@@ -63,6 +79,25 @@ export class ConsentsController {
     @Body() dto: SignConsentDto,
   ) {
     return this.consentsService.sign(clinicId, patientId, id, dto);
+  }
+
+  /**
+   * Baja de un firmado. El pendiente se borra con DELETE; este se anula.
+   *
+   * Pide la contraseña, así que va limitado: si no, alguien con la tablet
+   * desatendida podría probar claves de a una contra este endpoint.
+   */
+  @Post(':id/annul')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  annul(
+    @ClinicId() clinicId: string,
+    @Param('patientId') patientId: string,
+    @Param('id') id: string,
+    @Body() dto: AnnulConsentDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.consentsService.annul(clinicId, patientId, id, dto, user);
   }
 
   @Delete(':id')

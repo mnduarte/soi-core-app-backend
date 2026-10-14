@@ -114,10 +114,41 @@ export class Consent extends BaseEntity {
   @Prop()
   hash?: string;
 
-  // --- Fase 2: firma por link. Los campos van desde ahora para no migrar
-  // después, pero todavía no hay ninguna ruta pública que los use.
+  // --- Anulación.
+  /**
+   * Un consentimiento firmado no se borra: se anula.
+   *
+   * El documento sigue existiendo, se sigue pudiendo descargar y el PDF sale
+   * con el sello ANULADO, pero deja de valer como consentimiento. Que conste
+   * que existió y que se dio de baja —con quién y cuándo— es mejor respaldo
+   * que un papel desaparecido.
+   *
+   * Estos campos NO rompen la inmutabilidad de arriba: `finalText`, `dni`,
+   * `signedAt`, las firmas y el `hash` siguen intactos, así que lo que el
+   * paciente firmó se puede seguir verificando igual que antes.
+   */
+  @Prop()
+  annulledAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  annulledBy?: Types.ObjectId;
+
+  @Prop({ maxlength: 300 })
+  annulledReason?: string;
+
+  // --- Firma por link (WhatsApp).
+  /**
+   * SHA-256 del token, nunca el token en claro.
+   *
+   * El token ES la credencial: quien tenga el link puede leer y firmar este
+   * consentimiento. Guardando solo el hash, una filtración de la base no
+   * entrega links usables. Se usa SHA-256 y no argon2 —que es lo que usa el
+   * proyecto para contraseñas— justamente porque tiene que ser determinístico
+   * para poder buscarlo por índice; y alcanza, porque el token es aleatorio de
+   * 32 bytes y no algo que alguien pueda adivinar.
+   */
   @Prop({ index: true, sparse: true })
-  linkToken?: string;
+  linkTokenHash?: string;
 
   @Prop()
   linkExpiresAt?: Date;
