@@ -26,6 +26,10 @@ const COLLECTIONS: Record<string, string> = {
   gallery: 'gallerysessions',
   odontograms: 'odontograms',
   clinicalEntries: 'clinicalentries',
+  // Firmar desde otro dispositivo —el celular del paciente, por link— no
+  // llega de ninguna otra forma a la ficha que el profesional tiene
+  // abierta. Sin esto había que refrescar a mano para ver el FIRMADO.
+  consents: 'consents',
 };
 
 /**
