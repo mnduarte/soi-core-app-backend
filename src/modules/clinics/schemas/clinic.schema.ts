@@ -75,11 +75,21 @@ export class ConsentTemplate {
 
 /** Features que se encienden consultorio por consultorio. Sirve para probar
  *  algo con un consultorio de prueba sin que aparezca en los productivos. */
+/**
+ * Interruptores por consultorio.
+ *
+ * Nacieron en `false` mientras Evolución y Consentimientos se probaban en un
+ * solo consultorio. Ya liberadas, el default es `true`: la pregunta dejó de
+ * ser "¿a quién se la prendo?" y pasó a ser "¿a quién habría que apagársela?".
+ *
+ * Siguen existiendo justamente por eso — para poder apagarle una a un
+ * consultorio puntual sin tocar el código ni afectar a los demás.
+ */
 export class ClinicFeatures {
-  @Prop({ default: false })
+  @Prop({ default: true })
   evolucion?: boolean;
 
-  @Prop({ default: false })
+  @Prop({ default: true })
   consentimientos?: boolean;
 }
 
