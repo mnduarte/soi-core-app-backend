@@ -21,6 +21,9 @@ import { ClinicId } from '../../common/decorators/clinic-id.decorator';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { DictarPacienteDto } from './dto/dictar-paciente.dto';
+import { PacienteDictadoService } from './paciente-dictado.service';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ScanFichaDto } from './dto/scan-ficha.dto';
 import { QuickCreatePatientDto } from './dto/quick-create-patient.dto';
 
@@ -46,7 +49,25 @@ function paraRecepcion(patient: unknown): Record<string, unknown> {
 @Controller('patients')
 @UseGuards(JwtAuthGuard)
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(
+    private readonly patientsService: PatientsService,
+    private readonly dictado: PacienteDictadoService,
+  ) {}
+
+  /**
+   * Reparte en campos lo que se dijo de un paciente. NO crea nada: devuelve
+   * los datos para que el formulario se llene a la vista y se revisen antes
+   * de guardar. Mismo criterio que el escaneo por foto, que tampoco guarda.
+   *
+   * Limitado: cada llamada cuesta plata de verdad.
+   */
+  @Post('dictar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ClinicalGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  dictar(@Body() dto: DictarPacienteDto) {
+    return this.dictado.interpretar(dto.texto);
+  }
 
   // Crear paciente rápido desde agenda (solo nombre, se splitea automáticamente).
   @Post('quick-create')

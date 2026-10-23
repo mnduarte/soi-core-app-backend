@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import Anthropic from '@anthropic-ai/sdk';
+import { sinPensar } from '../../common/anthropic/sin-pensar';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import { Clinic, ClinicDocument } from '../clinics/schemas/clinic.schema';
 
@@ -191,6 +192,10 @@ export class AgendaIntentService {
         // una respuesta quedó cortada a la mitad y parecía un error del
         // modelo cuando era el límite.
         max_tokens: 700,
+        // Sin razonar: elegir fecha, hora y paciente de una lista no se
+        // razona, se lee. Antes el pensamiento se comía el presupuesto de
+        // tokens y la respuesta llegaba cortada. Ver sin-pensar.ts.
+        ...sinPensar(model),
         system: this.sistema(lista, horarios),
         messages: [{ role: 'user', content: texto }],
       });
