@@ -14,6 +14,41 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * La fecha que manda para un paciente: la más nueva entre su propio
+ * `updatedAt` —que cubre el alta y los cambios de datos— y lo que haya pasado
+ * en las otras colecciones.
+ */
+function ultima(p: { updatedAt?: Date; createdAt?: Date }, otra?: Date): Date {
+  const propia = p.updatedAt ?? p.createdAt ?? new Date(0);
+  return otra && otra > propia ? otra : propia;
+}
+
+/** Fila de cualquiera de las agregaciones que aportan "última vez tocado". */
+type ConUltima = { _id: unknown; lastAt?: Date | null };
+
+/**
+ * Junta varias agregaciones y se queda, por paciente, con la fecha más
+ * reciente de todas.
+ *
+ * Se hace acá y no en Mongo porque las cuatro consultas ya se están haciendo
+ * igual para los números del listado: unirlas en la base costaría un
+ * `$unionWith` y un viaje más para un dato que ya tenemos en memoria.
+ */
+function ultimaPorPaciente(grupos: ConUltima[][]): Map<string, Date> {
+  const fuera = new Map<string, Date>();
+  for (const filas of grupos) {
+    for (const f of filas) {
+      if (!f.lastAt) continue;
+      const id = String(f._id);
+      const fecha = new Date(f.lastAt);
+      const previa = fuera.get(id);
+      if (!previa || fecha > previa) fuera.set(id, fecha);
+    }
+  }
+  return fuera;
+}
+
 @Injectable()
 export class PatientsService {
   constructor(
@@ -188,11 +223,14 @@ export class PatientsService {
     // Contra Atlas el costo dominante es la latencia de red, no el cálculo: en
     // serie eran dos viajes encadenados, así queda uno solo.
     const [patients, stats] = await Promise.all([
+      // El orden final NO sale de acá: se arma abajo con la última actividad,
+      // que vive repartida en cuatro colecciones. Este sort alfabético queda
+      // como desempate para los que nunca se tocaron.
       this.patientModel.find(filter).sort({ lastName: 1, name: 1 }).exec(),
       this.listStats(clinicId),
     ]);
 
-    return patients.map((p) => {
+    const filas = patients.map((p) => {
       const id = String(p._id);
       const v = stats.visits.get(id);
       const realizado = stats.done.get(id) ?? 0;
@@ -206,8 +244,28 @@ export class PatientsService {
         appointmentsCount: v?.count ?? 0,
         faltas: v?.faltas ?? 0,
         balance: realizado - pagado,
+        /**
+         * La última vez que alguien hizo algo con este paciente: le cambió los
+         * datos, le agendó un turno, le cargó un trabajo o un pago, o le
+         * escribió la evolución. Abrir la ficha sin tocar nada NO cuenta —
+         * registrarlo obligaría a escribir en la base en cada visita y haría
+         * saltar la lista por mirar.
+         */
+        ultimaActividad: ultima(p, stats.actividad.get(id)),
       };
     });
+
+    /**
+     * Lo último tocado, arriba. Es el orden en que se trabaja de verdad: el
+     * paciente que acabás de crear o de atender es el que vas a volver a
+     * necesitar, y estaba perdido en la letra que le tocara.
+     *
+     * Desempata el alfabético que ya trajo Mongo, porque `sort` de JS es
+     * estable: los que nunca se tocaron quedan como venían.
+     */
+    return filas.sort(
+      (a, b) => b.ultimaActividad.getTime() - a.ultimaActividad.getTime(),
+    );
   }
 
   // Estadísticas del listado (última visita, turnos y saldo) como campos
@@ -230,7 +288,7 @@ export class PatientsService {
     // próximo hasta que el día termina.
     const hoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const [visits, done, paid] = await Promise.all([
+    const [visits, done, paid, notas] = await Promise.all([
       // Turnos: total + fecha del último ya ocurrido (excluye cancelados).
       this.connection
         .collection('appointments')
@@ -293,6 +351,10 @@ export class PatientsService {
               faltas: {
                 $sum: { $cond: [{ $eq: ['$status', 'NO_SHOW'] }, 1, 0] },
               },
+              // Cuándo se agendó o se cambió un turno de este paciente. Es una
+              // de las cuatro cosas que cuentan como "tocar" la ficha; ver
+              // `ultimaActividad` en findAll.
+              lastAt: { $max: '$updatedAt' },
             },
           },
         ])
@@ -301,16 +363,59 @@ export class PatientsService {
       this.connection
         .collection('works')
         .aggregate([
-          { $match: { clinicId: cid, deletedAt: null, status: 'COMPLETED' } },
-          { $group: { _id: '$patientId', total: { $sum: '$price' } } },
+          // Entran todos los trabajos, no solo los hechos: agregar uno
+          // pendiente también es tocar la ficha. El total sigue contando solo
+          // los COMPLETED, ahora con un $cond en vez de con el filtro.
+          { $match: { clinicId: cid, deletedAt: null } },
+          {
+            $group: {
+              _id: '$patientId',
+              total: {
+                $sum: {
+                  $cond: [{ $eq: ['$status', 'COMPLETED'] }, '$price', 0],
+                },
+              },
+              lastAt: { $max: '$updatedAt' },
+            },
+          },
         ])
         .toArray(),
       // Pagos del paciente.
       this.connection
         .collection('transactions')
         .aggregate([
-          { $match: { clinicId: cid, type: 'PAYMENT', voidedAt: null } },
-          { $group: { _id: '$patientId', total: { $sum: '$amount' } } },
+          // Mismo criterio que arriba: cualquier movimiento cuenta como
+          // actividad, pero lo pagado sigue siendo solo los PAYMENT vivos.
+          { $match: { clinicId: cid } },
+          {
+            $group: {
+              _id: '$patientId',
+              total: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $eq: ['$type', 'PAYMENT'] },
+                        { $eq: [{ $ifNull: ['$voidedAt', null] }, null] },
+                      ],
+                    },
+                    '$amount',
+                    0,
+                  ],
+                },
+              },
+              lastAt: { $max: '$updatedAt' },
+            },
+          },
+        ])
+        .toArray(),
+      // Notas de evolución. No aportan ningún número al listado: están solo
+      // para el orden, porque escribir la evolución es tocar la ficha.
+      this.connection
+        .collection('clinicalentries')
+        .aggregate([
+          { $match: { clinicId: cid, deletedAt: null } },
+          { $group: { _id: '$patientId', lastAt: { $max: '$updatedAt' } } },
         ])
         .toArray(),
     ]);
@@ -334,6 +439,14 @@ export class PatientsService {
       ),
       done: totalsById(done as { _id: unknown; total: number }[]),
       paid: totalsById(paid as { _id: unknown; total: number }[]),
+      // La última vez que se tocó algo de cada paciente, mirando las cuatro
+      // colecciones juntas. Se queda con la más reciente de todas.
+      actividad: ultimaPorPaciente([
+        visits as ConUltima[],
+        done as ConUltima[],
+        paid as ConUltima[],
+        notas as ConUltima[],
+      ]),
     };
   }
 
