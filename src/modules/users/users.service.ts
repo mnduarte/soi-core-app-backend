@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateTourDto } from './dto/update-tour.dto';
 import { JwtPayload } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
@@ -33,6 +34,55 @@ export class UsersService {
       .exec();
     if (!user) throw new NotFoundException('Usuario no encontrado');
     return user;
+  }
+
+  /**
+   * Guarda el avance de las ayudas de primera vez.
+   *
+   * **Suma, no reemplaza.** La misma persona puede tener la app abierta en la
+   * tablet y en la computadora; si cada una pisara el estado de la otra, las
+   * ayudas cerradas en una volverían a salir en la otra. Unir listas es
+   * monótono: nada de lo ya visto se pierde por una carrera entre dispositivos.
+   * Para volver atrás está `resetTour`, que es un pedido explícito.
+   *
+   * Los contadores se quedan con el MAYOR por la misma razón: son "cuántos
+   * turnos anotó", y el número más alto es el que vio más historia.
+   */
+  async updateTour(clinicId: string, userId: string, dto: UpdateTourDto) {
+    const user = await this.findById(clinicId, userId);
+    const actual = user.tour ?? { vistas: [], contadores: {} };
+
+    const vistas = dto.vistas
+      ? [...new Set([...(actual.vistas ?? []), ...dto.vistas])]
+      : (actual.vistas ?? []);
+
+    const contadores = { ...(actual.contadores ?? {}) };
+    if (dto.contadores) {
+      for (const [clave, valor] of Object.entries(dto.contadores)) {
+        // Saneo acá y no en el DTO: class-validator no mira adentro de un
+        // objeto libre. Clave con forma de clave, valor entero y acotado.
+        if (!/^[a-z0-9-]{1,40}$/.test(clave)) continue;
+        if (typeof valor !== 'number' || !Number.isFinite(valor)) continue;
+        const n = Math.min(Math.max(Math.trunc(valor), 0), 100000);
+        contadores[clave] = Math.max(contadores[clave] ?? 0, n);
+      }
+    }
+
+    user.tour = { vistas, contadores };
+    user.updatedBy = new Types.ObjectId(userId);
+    await user.save();
+    return user.tour;
+  }
+
+  /** "Volver a ver las ayudas": borra las banderas Y los contadores. Sin los
+   *  contadores no alcanza — hay ayudas que salen al segundo turno o al
+   *  segundo trabajo, y con la cuenta vieja esas no volverían a aparecer. */
+  async resetTour(clinicId: string, userId: string) {
+    const user = await this.findById(clinicId, userId);
+    user.tour = { vistas: [], contadores: {} };
+    user.updatedBy = new Types.ObjectId(userId);
+    await user.save();
+    return user.tour;
   }
 
   async update(

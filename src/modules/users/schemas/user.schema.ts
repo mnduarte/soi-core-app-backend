@@ -40,6 +40,34 @@ export class ClinicalProfile {
   agendaColor?: string;
 }
 
+/**
+ * Ayudas de primera vez ya vistas por esta persona.
+ *
+ * Va en el USUARIO y no en el navegador porque las ayudas son por persona, no
+ * por dispositivo: el mismo odontólogo abre la app en la tablet del
+ * consultorio, en su teléfono y en la computadora del escritorio, y con el
+ * estado en `localStorage` el recorrido volvía a empezar en cada uno.
+ *
+ * Es un CONJUNTO DE BANDERAS, no un paso dentro de un recorrido: `vistas`
+ * tiene el ID de cada grupo de globos que cerró con "Entendido". Por eso
+ * agregar una ayuda nueva más adelante no reabre las viejas — es un ID que no
+ * está en la lista, y los que sí están siguen marcados.
+ */
+export class TourState {
+  /** IDs de los grupos cerrados con "Entendido". */
+  @Prop({ type: [String], default: [] })
+  vistas: string[];
+
+  /**
+   * Cuántas veces hizo cada cosa: `turnos` anotados, `trabajos` cargados.
+   * Hay ayudas que no van la primera vez sino la segunda (el dictado: primero
+   * que entienda la forma larga). Mapa libre y no un campo por cosa, así cada
+   * pantalla nueva trae su propia cuenta sin cambiar el formato guardado.
+   */
+  @Prop({ type: Object, default: {} })
+  contadores: Record<string, number>;
+}
+
 @Schema({ collection: 'users', timestamps: true })
 export class User extends BaseEntity {
   @Prop({ required: true, type: Types.ObjectId, ref: 'Clinic' })
@@ -74,6 +102,9 @@ export class User extends BaseEntity {
 
   @Prop()
   lastLoginAt?: Date;
+
+  @Prop({ type: Object })
+  tour?: TourState;
 
   // Set to true when an admin creates the account or resets credentials.
   // Forces the user through a "create your password" flow on first login.

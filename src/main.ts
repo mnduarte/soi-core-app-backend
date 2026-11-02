@@ -16,6 +16,26 @@ const DEV_ORIGINS = [
   'http://localhost:4173',
 ];
 
+/**
+ * La misma app servida desde la IP de la red local, en desarrollo.
+ *
+ * Es la única forma de abrirla en el teléfono sin deployar: el celular no
+ * puede resolver el `localhost` de la computadora, así que el front se sirve
+ * con `--host` y tanto la página como la API se piden a `192.168.x.x`. Ese
+ * origen no está —ni puede estar— en la lista fija: la IP la reparte el router
+ * y cambia.
+ *
+ * Solo rangos PRIVADOS (los tres que define la RFC 1918) y solo los puertos de
+ * los servidores de desarrollo. Y nunca en producción: ahí vale únicamente lo
+ * que venga en `FRONTEND_URLS`.
+ */
+const LAN_DEV =
+  /^http:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):(?:5173|5174|4173)$/;
+
+function esLanDeDesarrollo(origin: string): boolean {
+  return process.env.NODE_ENV !== 'production' && LAN_DEV.test(origin);
+}
+
 function parseAllowedOrigins(): string[] {
   // Comma-separated list (e.g.
   //   FRONTEND_URLS=https://app.soi.com,https://console.soi.com
@@ -36,8 +56,19 @@ async function bootstrap() {
   // (a downscaled photo is a few hundred KB, well over the 100kb default).
   app.useBodyParser('json', { limit: '12mb' });
 
+  const permitidos = parseAllowedOrigins();
   app.enableCors({
-    origin: parseAllowedOrigins(),
+    // Función y no lista porque la IP de la red local no se puede listar de
+    // antemano. Sin `origin` (curl, el healthcheck de Fly, una app nativa) no
+    // hay nada que validar: CORS protege al navegador de otra página, no al
+    // servidor.
+    origin: (origin, cb) => {
+      // `false` y no un Error: sin el `Access-Control-Allow-Origin` el
+      // navegador ya bloquea la respuesta, que es todo lo que hay que hacer.
+      // Con un Error, en cambio, el preflight terminaba en 500 —y los 5xx se
+      // loguean— por algo que no es una falla del servidor.
+      cb(null, !origin || permitidos.includes(origin) || esLanDeDesarrollo(origin));
+    },
     credentials: true,
   });
 
